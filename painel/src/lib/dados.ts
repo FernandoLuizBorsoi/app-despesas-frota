@@ -54,7 +54,7 @@ export async function buscarDespesas(f: Filtros): Promise<Despesa[]> {
     .from("despesa")
     .select(
       "id, data, valor, km_odometro, litros, forma_pagamento, observacao, motorista_id, veiculo_id, categoria_id," +
-        " motorista:usuario(nome), veiculo:veiculo(placa), categoria:categoria(nome), comprovante(caminho, ordem)",
+        " motorista:usuario!despesa_motorista_id_fkey(nome), veiculo:veiculo(placa), categoria:categoria(nome), comprovante(caminho, ordem)",
     )
     .gte("data", f.de)
     .lte("data", f.ate)
