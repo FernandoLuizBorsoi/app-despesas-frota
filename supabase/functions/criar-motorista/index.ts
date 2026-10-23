@@ -9,6 +9,21 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Motoristas entram com o CPF; o login do Supabase usa um e-mail no domínio reservado
+// ".invalid" (nunca recebe mensagens). Mesmo formato de painel/src/lib/login.ts.
+const DOMINIO_CPF = "cpf.invalid";
+
+function cpfValido(cpf: string): boolean {
+  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+  const digito = (ate: number) => {
+    let soma = 0;
+    for (let i = 0; i < ate; i++) soma += Number(cpf[i]) * (ate + 1 - i);
+    const resto = (soma * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+  return digito(9) === Number(cpf[9]) && digito(10) === Number(cpf[10]);
+}
+
 function resposta(status: number, corpo: Record<string, unknown>) {
   return new Response(JSON.stringify(corpo), {
     status,
@@ -37,18 +52,29 @@ Deno.serve(async (req) => {
     return resposta(403, { erro: "Só gestores podem cadastrar pessoas." });
   }
 
-  let corpo: { nome?: string; email?: string; senha?: string; perfil?: string; telefone?: string };
+  let corpo: { nome?: string; cpf?: string; email?: string; senha?: string; perfil?: string; telefone?: string };
   try {
     corpo = await req.json();
   } catch {
     return resposta(400, { erro: "Dados inválidos." });
   }
   const nome = corpo.nome?.trim();
-  const email = corpo.email?.trim().toLowerCase();
+  const cpf = (corpo.cpf ?? "").replace(/\D/g, "");
   const senha = corpo.senha ?? "";
   const perfil = corpo.perfil === "gestor" ? "gestor" : "motorista";
   if (!nome) return resposta(400, { erro: "Informe o nome." });
+  if (!cpfValido(cpf)) return resposta(400, { erro: "CPF inválido. Confira os números." });
+  // Gestores entram no painel com e-mail; motoristas, só com o CPF.
+  const email = perfil === "gestor" ? corpo.email?.trim().toLowerCase() : `${cpf}@${DOMINIO_CPF}`;
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return resposta(400, { erro: "E-mail inválido." });
+
+  const { data: mesmoCpf } = await admin
+    .from("usuario")
+    .select("id")
+    .eq("empresa_id", gestor.empresa_id)
+    .eq("cpf", cpf)
+    .maybeSingle();
+  if (mesmoCpf) return resposta(400, { erro: "Esse CPF já está cadastrado." });
   if (senha.length < 6) return resposta(400, { erro: "A senha precisa ter pelo menos 6 caracteres." });
 
   const { data: criado, error: erroCriar } = await admin.auth.admin.createUser({
@@ -59,13 +85,15 @@ Deno.serve(async (req) => {
   });
   if (erroCriar || !criado.user) {
     const jaExiste = erroCriar?.message.toLowerCase().includes("already");
-    return resposta(400, { erro: jaExiste ? "Esse e-mail já tem login." : (erroCriar?.message ?? "Erro ao criar login.") });
+    const qual = perfil === "gestor" ? "e-mail" : "CPF";
+    return resposta(400, { erro: jaExiste ? `Esse ${qual} já tem login.` : (erroCriar?.message ?? "Erro ao criar login.") });
   }
 
   const { error: erroUsuario } = await admin.from("usuario").insert({
     id: criado.user.id,
     empresa_id: gestor.empresa_id,
     nome,
+    cpf,
     perfil,
     telefone: corpo.telefone?.trim() || null,
   });
