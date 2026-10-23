@@ -92,7 +92,7 @@ export default function MinhasDespesas() {
               </Text>
               {!item.enviada && (
                 <Text style={styles.itemPendente}>
-                  {item.erro_envio ? 'Erro ao enviar, tentando de novo' : 'Aguardando envio'}
+                  {item.erro_envio ? `Erro ao enviar, tentando de novo (${item.erro_envio})` : 'Aguardando envio'}
                 </Text>
               )}
             </View>
