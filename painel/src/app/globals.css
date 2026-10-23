@@ -303,3 +303,9 @@ tr.clicavel:hover {
   border-radius: 10px;
   margin: 24px 0;
 }
+
+td.acoes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

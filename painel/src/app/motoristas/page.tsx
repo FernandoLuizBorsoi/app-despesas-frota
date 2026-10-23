@@ -63,10 +63,12 @@ export default function Motoristas() {
       setErro(data.erro);
       return;
     }
+    const numeros = cpf.replace(/\D/g, "");
+    const qualSenha = senha ? "a senha escolhida" : `a senha ${numeros.slice(0, 6)}`;
     setAviso(
       perfil === "gestor"
-        ? `${nome} cadastrado. Ele entra no painel com o e-mail ${email.trim().toLowerCase()} e a senha escolhida.`
-        : `${nome} cadastrado. Ele entra no app com o CPF ${formatarCpf(cpf.replace(/\D/g, ""))} e a senha escolhida.`,
+        ? `${nome} cadastrado. Ele entra no painel com o e-mail ${email.trim().toLowerCase()} e ${qualSenha}.`
+        : `${nome} cadastrado. Ele entra no app com o CPF ${formatarCpf(numeros)} e ${qualSenha}.`,
     );
     setNome("");
     setCpf("");
@@ -75,6 +77,22 @@ export default function Motoristas() {
     setTelefone("");
     setPerfil("motorista");
     recarregar();
+  }
+
+  async function senhaPadrao(p: Pessoa) {
+    const padrao = (p.cpf ?? "").slice(0, 6);
+    if (!confirm(`Voltar a senha de ${p.nome} para ${padrao} (6 primeiros números do CPF)?`)) return;
+    setErro(null);
+    setAviso(null);
+    const { data, error } = await supabase.functions.invoke("criar-motorista", {
+      body: { acao: "senha-padrao", id: p.id },
+    });
+    if (error || data?.erro) {
+      const corpo = error ? await (error as { context?: Response }).context?.json?.().catch(() => null) : data;
+      setErro(corpo?.erro ?? "Não foi possível trocar a senha. Tente de novo.");
+      return;
+    }
+    setAviso(`A senha de ${p.nome} agora é ${padrao}.`);
   }
 
   async function alternarAtivo(p: Pessoa) {
@@ -103,7 +121,12 @@ export default function Motoristas() {
         )}
         <label>
           Senha
-          <input value={senha} onChange={(e) => setSenha(e.target.value)} minLength={6} placeholder="mínimo 6 caracteres" required />
+          <input
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            minLength={6}
+            placeholder="em branco: 6 primeiros números do CPF"
+          />
         </label>
         <label>
           Telefone
@@ -143,7 +166,12 @@ export default function Motoristas() {
                 <td>{p.telefone}</td>
                 <td>{ROTULO_PERFIL[p.perfil]}</td>
                 <td>{p.ativo ? "Ativo" : "Inativo"}</td>
-                <td>
+                <td className="acoes">
+                  {p.cpf && p.perfil === "motorista" && (
+                    <button className="botao secundario" onClick={() => senhaPadrao(p)}>
+                      Senha padrão
+                    </button>
+                  )}
                   <button className="botao secundario" onClick={() => alternarAtivo(p)}>
                     {p.ativo ? "Desativar" : "Reativar"}
                   </button>
@@ -153,7 +181,8 @@ export default function Motoristas() {
           </tbody>
         </table>
         <p className="rotulo-suave">
-          Quem for desativado não consegue mais lançar despesas, mas o histórico continua nos relatórios.
+          Quem for desativado não consegue mais lançar despesas, mas o histórico continua nos relatórios. Se um
+          motorista esquecer a senha, use Senha padrão: ela volta a ser os 6 primeiros números do CPF.
         </p>
       </div>
     </>
