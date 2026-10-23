@@ -17,7 +17,8 @@ async function compactarEGuardar(uri: string, largura: number): Promise<string> 
   );
   if (!pasta.exists) pasta.create({ intermediates: true });
   const arquivo = new File(reduzida.uri);
-  arquivo.move(pasta);
+  // move é assíncrono: sem esperar, o uri ainda apontaria para o arquivo temporário.
+  await arquivo.move(pasta);
   return arquivo.uri;
 }
 
@@ -42,7 +43,12 @@ export async function escolherDaGaleria(): Promise<string[]> {
 }
 
 export async function lerBytes(uri: string): Promise<ArrayBuffer> {
-  return new File(uri).arrayBuffer();
+  let arquivo = new File(uri);
+  // A primeira versão do app guardava o endereço temporário da foto, que depois ia para a pasta
+  // de comprovantes com o mesmo nome. Procura lá antes de desistir.
+  if (!arquivo.exists) arquivo = new File(pasta, arquivo.name);
+  if (!arquivo.exists) throw new Error('A foto do comprovante não foi encontrada no celular.');
+  return arquivo.arrayBuffer();
 }
 
 export function apagarFoto(uri: string): void {

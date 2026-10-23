@@ -32,6 +32,28 @@ export function dataTextoDeIso(iso: string): string {
   return `${dia}/${mes}/${ano}`;
 }
 
+const MESES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+
+// Mês no formato AAAA-MM.
+export function mesAtual(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function somarMeses(mes: string, quantos: number): string {
+  const [ano, m] = mes.split('-').map(Number);
+  const d = new Date(ano, m - 1 + quantos, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function nomeDoMes(mes: string): string {
+  const [ano, m] = mes.split('-').map(Number);
+  return `${MESES[m - 1]} de ${ano}`;
+}
+
 export function hojeTexto(): string {
   const d = new Date();
   const dois = (n: number) => String(n).padStart(2, '0');

@@ -1,8 +1,8 @@
 import NetInfo from '@react-native-community/netinfo';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { AppState } from 'react-native';
-import { limparTudo } from './banco-local';
+import { Alert, AppState } from 'react-native';
+import { limparTudo, listarPendentes } from './banco-local';
 import { carregarPerfil, sincronizar } from './sincronizar';
 import { supabase } from './supabase';
 import type { Perfil } from './tipos';
@@ -78,8 +78,21 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
   }, [perfil, sincronizarAgora]);
 
   const sair = useCallback(async () => {
-    await supabase.auth.signOut();
-    await limparTudo();
+    const encerrar = async () => {
+      await supabase.auth.signOut();
+      await limparTudo();
+    };
+    // Sair apaga o que está no celular: avisa antes se ainda há despesa sem enviar.
+    const pendentes = (await listarPendentes()).length;
+    if (pendentes === 0) return encerrar();
+    Alert.alert(
+      'Despesas não enviadas',
+      `Você tem ${pendentes} despesa(s) que ainda não foram enviadas. Se sair agora, elas serão apagadas deste celular.`,
+      [
+        { text: 'Ficar', style: 'cancel' },
+        { text: 'Sair e apagar', style: 'destructive', onPress: () => void encerrar() },
+      ],
+    );
   }, []);
 
   return (
