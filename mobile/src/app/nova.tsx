@@ -1,15 +1,50 @@
 import * as Crypto from 'expo-crypto';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { cacheCategorias, cacheVeiculos, listarDespesas, salvarDespesa } from '../lib/banco-local';
 import { cores, estilos } from '../lib/estilos';
-import { centavosDeTexto, dataIsoDeTexto, hojeTexto, numeroDeTexto } from '../lib/formato';
-import { apagarFoto, escolherDaGaleria, fotografarComprovante } from '../lib/fotos';
+import { centavosDeTexto, dataIsoDeTexto, dataTextoDeIso, hojeTexto, numeroDeTexto } from '../lib/formato';
+import { apagarFoto, escolherDaGaleria, fotografarComprovante, PREFIXO_REMOTO } from '../lib/fotos';
+import { lerValorDaFoto } from '../lib/ler-valor';
 import { useSessao } from '../lib/sessao';
+import { BUCKET_COMPROVANTES, supabase } from '../lib/supabase';
 import { FORMAS_PAGAMENTO, type Categoria, type Veiculo } from '../lib/tipos';
 
 const MAX_FOTOS = 5;
+
+function textoDeCentavos(centavos: number): string {
+  return (centavos / 100).toFixed(2).replace('.', ',');
+}
+
+function textoDeNumero(n: number | null): string {
+  return n === null ? '' : String(n).replace('.', ',');
+}
+
+type DespesaServidor = {
+  id: string;
+  veiculo_id: string;
+  categoria_id: string;
+  data: string;
+  valor: number;
+  km_odometro: number | null;
+  litros: number | null;
+  forma_pagamento: string | null;
+  observacao: string | null;
+  motivo_rejeicao: string | null;
+  criado_em: string;
+  comprovante: { caminho: string; ordem: number }[];
+};
 
 function Chips<T extends string>(props: {
   opcoes: { valor: T; rotulo: string }[];
@@ -36,6 +71,8 @@ function Chips<T extends string>(props: {
 
 export default function NovaDespesa() {
   const router = useRouter();
+  // Com id, é uma despesa que o gestor devolveu para corrigir.
+  const { id: idCorrecao } = useLocalSearchParams<{ id?: string }>();
   const { sincronizarAgora } = useSessao();
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -43,6 +80,8 @@ export default function NovaDespesa() {
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [veiculoId, setVeiculoId] = useState<string | null>(null);
   const [valor, setValor] = useState('');
+  const valorAtual = useRef(valor);
+  valorAtual.current = valor;
   const [data, setData] = useState(hojeTexto());
   const [km, setKm] = useState('');
   const [litros, setLitros] = useState('');
@@ -51,17 +90,83 @@ export default function NovaDespesa() {
   const [fotos, setFotos] = useState<string[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // Valor preenchido pela leitura da foto, que o motorista ainda precisa confirmar.
+  const [valorLido, setValorLido] = useState(false);
+  const [lendoValor, setLendoValor] = useState(false);
+  const [avisoValor, setAvisoValor] = useState<string | null>(null);
+  const [motivoRejeicao, setMotivoRejeicao] = useState<string | null>(null);
+  const [criadoEm, setCriadoEm] = useState<string | null>(null);
+  const [carregandoCorrecao, setCarregandoCorrecao] = useState(Boolean(idCorrecao));
+  const [linksRemotos, setLinksRemotos] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     Promise.all([cacheVeiculos.ler(), cacheCategorias.ler(), listarDespesas()]).then(([v, c, anteriores]) => {
       setVeiculos(v ?? []);
       setCategorias(c ?? []);
+      if (idCorrecao) return;
       // O motorista costuma usar sempre o mesmo veículo: já deixa o último selecionado.
       const ultimo = anteriores[0]?.veiculo_id;
       if (ultimo && v?.some((x) => x.id === ultimo)) setVeiculoId(ultimo);
       else if (v?.length === 1) setVeiculoId(v[0].id);
     });
-  }, []);
+  }, [idCorrecao]);
+
+  useEffect(() => {
+    if (idCorrecao) carregarCorrecao(idCorrecao);
+  }, [idCorrecao]);
+
+  async function carregarCorrecao(id: string) {
+    const { data, error } = await supabase
+      .from('despesa')
+      .select(
+        'id, veiculo_id, categoria_id, data, valor, km_odometro, litros, forma_pagamento, observacao,' +
+          ' motivo_rejeicao, criado_em, comprovante(caminho, ordem)',
+      )
+      .eq('id', id)
+      .single();
+    if (error || !data) {
+      setErro('Não foi possível abrir a despesa. Confira a internet e tente de novo.');
+      setCarregandoCorrecao(false);
+      return;
+    }
+    const d = data as unknown as DespesaServidor;
+    const caminhos = [...d.comprovante].sort((a, b) => a.ordem - b.ordem).map((c) => c.caminho);
+    setCategoriaId(d.categoria_id);
+    setVeiculoId(d.veiculo_id);
+    setValor(textoDeCentavos(Math.round(d.valor * 100)));
+    setData(dataTextoDeIso(d.data));
+    setKm(d.km_odometro === null ? '' : String(d.km_odometro));
+    setLitros(textoDeNumero(d.litros));
+    setFormaPagamento(d.forma_pagamento);
+    setObservacao(d.observacao ?? '');
+    setMotivoRejeicao(d.motivo_rejeicao);
+    setCriadoEm(d.criado_em);
+    setFotos(caminhos.map((c) => PREFIXO_REMOTO + c));
+    setCarregandoCorrecao(false);
+    if (caminhos.length > 0) {
+      const { data: links } = await supabase.storage.from(BUCKET_COMPROVANTES).createSignedUrls(caminhos, 60 * 60);
+      setLinksRemotos(
+        new Map((links ?? []).map((l, i) => [PREFIXO_REMOTO + caminhos[i], l.signedUrl ?? ''])),
+      );
+    }
+  }
+
+  // Lê o valor da primeira foto, se o motorista ainda não digitou nada.
+  async function lerValor(uri: string) {
+    setLendoValor(true);
+    setAvisoValor(null);
+    const centavos = await lerValorDaFoto(uri);
+    setLendoValor(false);
+    if (centavos === null) {
+      setAvisoValor('Não consegui ler o valor na foto. Digite o valor.');
+      return;
+    }
+    // O motorista pode ter digitado enquanto a foto era lida: aí vale o que ele digitou.
+    if (valorAtual.current.trim()) return;
+    setValor(textoDeCentavos(centavos));
+    setValorLido(true);
+    setAvisoValor('Valor lido da foto. Confira se está certo.');
+  }
 
   const categoria = categorias.find((c) => c.id === categoriaId);
   const veiculo = veiculos.find((v) => v.id === veiculoId);
@@ -73,6 +178,7 @@ export default function NovaDespesa() {
           ? [await fotografarComprovante()].filter((f): f is string => f !== null)
           : await escolherDaGaleria();
       setFotos((atuais) => [...atuais, ...novas].slice(0, MAX_FOTOS));
+      if (novas.length > 0 && !valor.trim()) lerValor(novas[0]);
     } catch (e) {
       Alert.alert('Foto', e instanceof Error ? e.message : 'Não foi possível adicionar a foto.');
     }
@@ -104,7 +210,7 @@ export default function NovaDespesa() {
     setSalvando(true);
     try {
       await salvarDespesa({
-        id: Crypto.randomUUID(),
+        id: idCorrecao ?? Crypto.randomUUID(),
         veiculo_id: veiculoId!,
         categoria_id: categoriaId!,
         data: dados.dataIso,
@@ -116,7 +222,7 @@ export default function NovaDespesa() {
         fotos,
         enviada: false,
         erro_envio: null,
-        criado_em: new Date().toISOString(),
+        criado_em: criadoEm ?? new Date().toISOString(),
       });
       sincronizarAgora();
       router.back();
@@ -133,6 +239,23 @@ export default function NovaDespesa() {
       setErro(dados);
       return;
     }
+    if (valorLido) {
+      Alert.alert('Confirme o valor', `O valor lido da foto foi R$ ${valor}. Está certo?`, [
+        { text: 'Corrigir', style: 'cancel' },
+        {
+          text: 'Está certo',
+          onPress: () => {
+            setValorLido(false);
+            conferirKm(dados);
+          },
+        },
+      ]);
+      return;
+    }
+    conferirKm(dados);
+  }
+
+  function conferirKm(dados: Exclude<ReturnType<typeof validar>, string>) {
     if (dados.kmNumero !== null && veiculo && dados.kmNumero < veiculo.km_atual) {
       Alert.alert(
         'Confira o km',
@@ -147,6 +270,17 @@ export default function NovaDespesa() {
     gravar(dados);
   }
 
+  const titulo = <Stack.Screen options={{ title: idCorrecao ? 'Corrigir despesa' : 'Nova despesa' }} />;
+
+  if (carregandoCorrecao) {
+    return (
+      <View style={[estilos.tela, estilos.conteudo, { alignItems: 'center' }]}>
+        {titulo}
+        <ActivityIndicator size="large" color={cores.primaria} />
+      </View>
+    );
+  }
+
   if (categorias.length === 0 || veiculos.length === 0) {
     return (
       <View style={[estilos.tela, estilos.conteudo]}>
@@ -159,12 +293,22 @@ export default function NovaDespesa() {
 
   return (
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled">
+      {titulo}
+      {motivoRejeicao && (
+        <View style={styles.motivo}>
+          <Text style={styles.motivoTitulo}>O gestor pediu para corrigir:</Text>
+          <Text style={styles.motivoTexto}>{motivoRejeicao}</Text>
+        </View>
+      )}
       <View>
         <Text style={estilos.rotulo}>Comprovante</Text>
         <View style={styles.fotos}>
           {fotos.map((uri) => (
             <Pressable key={uri} onLongPress={() => removerFoto(uri)}>
-              <Image source={{ uri }} style={styles.miniatura} />
+              <Image
+                source={{ uri: uri.startsWith(PREFIXO_REMOTO) ? linksRemotos.get(uri) : uri }}
+                style={styles.miniatura}
+              />
             </Pressable>
           ))}
         </View>
@@ -203,12 +347,17 @@ export default function NovaDespesa() {
         <View style={{ flex: 1 }}>
           <Text style={estilos.rotulo}>Valor (R$)</Text>
           <TextInput
-            style={estilos.campo}
+            style={[estilos.campo, valorLido && styles.campoLido]}
             value={valor}
-            onChangeText={setValor}
+            onChangeText={(texto) => {
+              setValor(texto);
+              setValorLido(false);
+              setAvisoValor(null);
+            }}
             keyboardType="decimal-pad"
-            placeholder="0,00"
+            placeholder={lendoValor ? 'Lendo a foto...' : '0,00'}
           />
+          {avisoValor && <Text style={[styles.dica, valorLido && styles.avisoLido]}>{avisoValor}</Text>}
         </View>
         <View style={{ flex: 1 }}>
           <Text style={estilos.rotulo}>Data</Text>
@@ -268,7 +417,9 @@ export default function NovaDespesa() {
 
       {erro && <Text style={estilos.erro}>{erro}</Text>}
       <Pressable style={[estilos.botao, salvando && { opacity: 0.6 }]} onPress={salvar} disabled={salvando}>
-        <Text style={estilos.botaoTexto}>{salvando ? 'Salvando...' : 'Salvar despesa'}</Text>
+        <Text style={estilos.botaoTexto}>
+          {salvando ? 'Salvando...' : idCorrecao ? 'Enviar correção' : 'Salvar despesa'}
+        </Text>
       </Pressable>
     </ScrollView>
   );
@@ -279,4 +430,9 @@ const styles = StyleSheet.create({
   fotos: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   miniatura: { width: 90, height: 120, borderRadius: 6, backgroundColor: cores.borda },
   dica: { fontSize: 12, color: cores.suave, marginBottom: 8 },
+  campoLido: { borderColor: cores.aviso, borderWidth: 2 },
+  avisoLido: { color: cores.aviso, fontWeight: '600', marginTop: 4 },
+  motivo: { backgroundColor: '#FDECEA', borderColor: cores.erro, borderWidth: 1, borderRadius: 8, padding: 12 },
+  motivoTitulo: { fontSize: 14, fontWeight: '700', color: cores.erro },
+  motivoTexto: { fontSize: 15, color: cores.texto, marginTop: 4 },
 });

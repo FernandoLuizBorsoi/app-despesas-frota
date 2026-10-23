@@ -9,6 +9,10 @@ const QUALIDADE_JPEG = 0.6;
 
 const pasta = new Directory(Paths.document, 'comprovantes');
 
+// Ao corrigir uma despesa, as fotos que já estão no servidor entram na lista com este prefixo
+// seguido do caminho no bucket, e não são enviadas de novo.
+export const PREFIXO_REMOTO = 'remoto:';
+
 async function compactarEGuardar(uri: string, largura: number): Promise<string> {
   const reduzida = await manipulateAsync(
     uri,
@@ -52,6 +56,7 @@ export async function lerBytes(uri: string): Promise<ArrayBuffer> {
 }
 
 export function apagarFoto(uri: string): void {
+  if (uri.startsWith(PREFIXO_REMOTO)) return;
   const arquivo = new File(uri);
   if (arquivo.exists) arquivo.delete();
 }

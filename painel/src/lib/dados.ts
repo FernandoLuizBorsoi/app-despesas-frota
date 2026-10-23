@@ -26,6 +26,16 @@ export type Despesa = {
   veiculo: { placa: string } | null;
   categoria: { nome: string } | null;
   comprovante: { caminho: string; ordem: number }[];
+  situacao: Situacao;
+  motivo_rejeicao: string | null;
+};
+
+export type Situacao = "pendente" | "aprovada" | "rejeitada";
+
+export const NOMES_SITUACAO: Record<Situacao, string> = {
+  pendente: "Aguardando aprovação",
+  aprovada: "Aprovada",
+  rejeitada: "Rejeitada",
 };
 
 export type Filtros = {
@@ -34,6 +44,7 @@ export type Filtros = {
   motoristaId: string;
   veiculoId: string;
   categoriaId: string;
+  situacao: string;
 };
 
 export async function carregarOpcoes() {
@@ -54,7 +65,8 @@ export async function buscarDespesas(f: Filtros): Promise<Despesa[]> {
     .from("despesa")
     .select(
       "id, data, valor, km_odometro, litros, forma_pagamento, observacao, motorista_id, veiculo_id, categoria_id," +
-        " motorista:usuario(nome), veiculo:veiculo(placa), categoria:categoria(nome), comprovante(caminho, ordem)",
+        " motorista:usuario!despesa_motorista_id_fkey(nome), veiculo:veiculo(placa), categoria:categoria(nome), comprovante(caminho, ordem)," +
+        " situacao, motivo_rejeicao",
     )
     .gte("data", f.de)
     .lte("data", f.ate)
@@ -64,9 +76,19 @@ export async function buscarDespesas(f: Filtros): Promise<Despesa[]> {
   if (f.motoristaId) consulta = consulta.eq("motorista_id", f.motoristaId);
   if (f.veiculoId) consulta = consulta.eq("veiculo_id", f.veiculoId);
   if (f.categoriaId) consulta = consulta.eq("categoria_id", f.categoriaId);
+  if (f.situacao) consulta = consulta.eq("situacao", f.situacao);
   const { data, error } = await consulta;
   if (error) throw error;
   return (data ?? []) as unknown as Despesa[];
+}
+
+// Aprova ou rejeita; ao rejeitar, o motivo aparece no app do motorista.
+export async function avaliarDespesa(id: string, situacao: "aprovada" | "rejeitada", motivo?: string) {
+  const { error } = await supabase
+    .from("despesa")
+    .update(situacao === "rejeitada" ? { situacao, motivo_rejeicao: motivo } : { situacao })
+    .eq("id", id);
+  if (error) throw error;
 }
 
 export async function linksDasFotos(caminhos: string[]): Promise<string[]> {

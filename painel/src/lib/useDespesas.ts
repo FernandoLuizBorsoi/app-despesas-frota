@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { buscarDespesas, type Despesa, type Filtros } from "./dados";
 
 type Resultado = { chave: string; despesas: Despesa[]; erro: string | null };
@@ -8,7 +8,8 @@ type Resultado = { chave: string; despesas: Despesa[]; erro: string | null };
 // Busca as despesas sempre que os filtros mudam; "carregando" vale enquanto
 // o resultado na tela ainda é de outros filtros.
 export function useDespesas(filtros: Filtros) {
-  const chave = JSON.stringify(filtros);
+  const [versao, setVersao] = useState(0);
+  const chave = JSON.stringify({ ...filtros, versao });
   const [resultado, setResultado] = useState<Resultado>({ chave: "", despesas: [], erro: null });
 
   useEffect(() => {
@@ -22,5 +23,13 @@ export function useDespesas(filtros: Filtros) {
     };
   }, [chave]);
 
-  return { despesas: resultado.despesas, erro: resultado.erro, carregando: resultado.chave !== chave };
+  // Busca de novo com os mesmos filtros, por exemplo depois de aprovar uma despesa.
+  const recarregar = useCallback(() => setVersao((v) => v + 1), []);
+
+  return {
+    despesas: resultado.despesas,
+    erro: resultado.erro,
+    carregando: resultado.chave !== chave,
+    recarregar,
+  };
 }

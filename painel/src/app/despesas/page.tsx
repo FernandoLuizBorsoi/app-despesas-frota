@@ -2,21 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { FILTROS_INICIAIS, FiltrosDespesas } from "@/components/FiltrosDespesas";
-import { linksDasFotos, type Despesa, type Filtros } from "@/lib/dados";
+import { avaliarDespesa, linksDasFotos, NOMES_SITUACAO, type Despesa, type Filtros } from "@/lib/dados";
 import { baixarCsv, dataBr, numero, reais } from "@/lib/formato";
 import { useDespesas } from "@/lib/useDespesas";
 
 export default function Despesas() {
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIAIS);
-  const { despesas, erro, carregando } = useDespesas(filtros);
+  const { despesas, erro, carregando, recarregar } = useDespesas(filtros);
   const [aberta, setAberta] = useState<Despesa | null>(null);
 
   const total = despesas.reduce((soma, d) => soma + Number(d.valor), 0);
+  const aguardando = despesas.filter((d) => d.situacao === "pendente").length;
 
   function exportar() {
     baixarCsv(
       `despesas_${filtros.de}_a_${filtros.ate}.csv`,
-      ["Data", "Motorista", "Veículo", "Categoria", "Valor (R$)", "Km", "Litros", "Pagamento", "Observação", "Fotos"],
+      ["Data", "Motorista", "Veículo", "Categoria", "Valor (R$)", "Km", "Litros", "Pagamento", "Observação", "Fotos", "Situação", "Motivo da rejeição"],
       despesas.map((d) => [
         dataBr(d.data),
         d.motorista?.nome ?? "",
@@ -28,6 +29,8 @@ export default function Despesas() {
         d.forma_pagamento,
         d.observacao,
         d.comprovante.length,
+        NOMES_SITUACAO[d.situacao],
+        d.motivo_rejeicao,
       ]),
     );
   }
@@ -50,6 +53,14 @@ export default function Despesas() {
           <div className="rotulo-suave">Lançamentos</div>
           <div className="valor">{despesas.length}</div>
         </div>
+        <div
+          className="cartao clicavel"
+          title="Mostrar só as que aguardam aprovação"
+          onClick={() => setFiltros({ ...filtros, situacao: "pendente" })}
+        >
+          <div className="rotulo-suave">Aguardando aprovação</div>
+          <div className="valor">{aguardando}</div>
+        </div>
       </div>
 
       <div className="cartao tabela-rolagem">
@@ -69,6 +80,7 @@ export default function Despesas() {
                 <th className="numero">Km</th>
                 <th className="numero">Valor</th>
                 <th>Fotos</th>
+                <th>Situação</th>
               </tr>
             </thead>
             <tbody>
@@ -81,6 +93,9 @@ export default function Despesas() {
                   <td className="numero">{d.km_odometro === null ? "" : numero(d.km_odometro)}</td>
                   <td className="numero">{reais(Number(d.valor))}</td>
                   <td>{d.comprovante.length > 0 ? `Ver (${d.comprovante.length})` : "Sem foto"}</td>
+                  <td>
+                    <span className={`selo ${d.situacao}`}>{NOMES_SITUACAO[d.situacao]}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -88,13 +103,50 @@ export default function Despesas() {
         )}
       </div>
 
-      {aberta && <DetalheDespesa despesa={aberta} aoFechar={() => setAberta(null)} />}
+      {aberta && (
+        <DetalheDespesa
+          despesa={aberta}
+          aoFechar={() => setAberta(null)}
+          aoAvaliar={() => {
+            setAberta(null);
+            recarregar();
+          }}
+        />
+      )}
     </>
   );
 }
 
-function DetalheDespesa({ despesa: d, aoFechar }: { despesa: Despesa; aoFechar: () => void }) {
+function DetalheDespesa({
+  despesa: d,
+  aoFechar,
+  aoAvaliar,
+}: {
+  despesa: Despesa;
+  aoFechar: () => void;
+  aoAvaliar: () => void;
+}) {
   const [fotos, setFotos] = useState<string[] | null>(null);
+  const [rejeitando, setRejeitando] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function avaliar(situacao: "aprovada" | "rejeitada") {
+    if (situacao === "rejeitada" && !motivo.trim()) {
+      setErro("Escreva o que o motorista precisa corrigir.");
+      return;
+    }
+    setSalvando(true);
+    setErro(null);
+    try {
+      await avaliarDespesa(d.id, situacao, motivo.trim());
+      aoAvaliar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível salvar.");
+      setSalvando(false);
+    }
+  }
 
   useEffect(() => {
     const caminhos = [...d.comprovante].sort((a, b) => a.ordem - b.ordem).map((c) => c.caminho);
@@ -129,8 +181,58 @@ function DetalheDespesa({ despesa: d, aoFechar }: { despesa: Despesa; aoFechar: 
             {d.litros !== null && <tr><th>Litros</th><td>{numero(Number(d.litros), 2)}</td></tr>}
             {d.forma_pagamento && <tr><th>Pagamento</th><td>{d.forma_pagamento}</td></tr>}
             {d.observacao && <tr><th>Observação</th><td>{d.observacao}</td></tr>}
+            <tr>
+              <th>Situação</th>
+              <td>
+                <span className={`selo ${d.situacao}`}>{NOMES_SITUACAO[d.situacao]}</span>
+              </td>
+            </tr>
+            {d.motivo_rejeicao && (
+              <tr>
+                <th>{d.situacao === "rejeitada" ? "Pedido ao motorista" : "Último pedido de ajuste"}</th>
+                <td>{d.motivo_rejeicao}</td>
+              </tr>
+            )}
           </tbody>
         </table>
+        {d.situacao !== "aprovada" && (
+          <div className="avaliacao">
+            {rejeitando ? (
+              <>
+                <label>
+                  O que o motorista precisa corrigir?
+                  <textarea
+                    value={motivo}
+                    onChange={(e) => setMotivo(e.target.value)}
+                    rows={3}
+                    autoFocus
+                    placeholder="Ex.: a foto do cupom está ilegível, tire outra."
+                  />
+                </label>
+                <div className="botoes">
+                  <button className="botao perigo" onClick={() => avaliar("rejeitada")} disabled={salvando}>
+                    Enviar para o motorista corrigir
+                  </button>
+                  <button className="botao secundario" onClick={() => setRejeitando(false)} disabled={salvando}>
+                    Cancelar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="botoes">
+                <button className="botao" onClick={() => avaliar("aprovada")} disabled={salvando}>
+                  Aprovar
+                </button>
+                {d.situacao !== "rejeitada" && (
+                  <button className="botao perigo" onClick={() => setRejeitando(true)} disabled={salvando}>
+                    Rejeitar
+                  </button>
+                )}
+              </div>
+            )}
+            {erro && <p className="erro">{erro}</p>}
+          </div>
+        )}
         <div className="fotos">
           {fotos === null && <p>Carregando fotos...</p>}
           {fotos?.length === 0 && <p className="rotulo-suave">Sem fotos.</p>}
