@@ -34,6 +34,12 @@
         }
       ]
     ],
-    "scheme": "despesasfrota"
+    "scheme": "despesasfrota",
+    "owner": "fernandoborsoi",
+    "extra": {
+      "eas": {
+        "projectId": "649d870b-0275-4c72-b445-05bc300e6b8c"
+      }
+    }
   }
 }
