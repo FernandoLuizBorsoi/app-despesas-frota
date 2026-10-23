@@ -20,7 +20,7 @@ type Estado =
   | { tipo: "sem-permissao" }
   | { tipo: "ok"; nome: string };
 
-// Envolve todas as páginas: exige login e perfil de gestor ou admin.
+// Envolve todas as páginas (menos /app): exige login e perfil de gestor ou admin.
 export function Painel({ children }: { children: ReactNode }) {
   const caminho = usePathname();
   const [estado, setEstado] = useState<Estado>({ tipo: "carregando" });
@@ -39,6 +39,8 @@ export function Painel({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, []);
 
+  // A página de baixar o app é aberta pelos motoristas, sem login.
+  if (caminho === "/app") return <>{children}</>;
   if (estado.tipo === "carregando") return <div className="centro">Carregando...</div>;
   if (estado.tipo === "deslogado") return <Login />;
   if (estado.tipo === "sem-permissao") {
