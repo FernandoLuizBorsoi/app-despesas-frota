@@ -55,6 +55,8 @@ O painel do gestor mostra as despesas com as fotos, relatórios por veículo, ca
 
    O link do APK aparece no final; abra no celular do motorista para instalar.
 
+   Também dá para gerar sem instalar nada, pela Expo ligada a este repositório. Veja `mobile/README.md`.
+
 Para desenvolver: `npx expo run:android` com um celular ligado por cabo ou um emulador. O app usa câmera e banco local, então precisa de uma build de desenvolvimento, não do Expo Go.
 
 ## Verificações
