@@ -248,7 +248,7 @@ export default function MinhasDespesas() {
         renderItem={({ item }) => (
           <Pressable
             style={[styles.item, item.situacao === 'rejeitada' && styles.itemRejeitado]}
-            onPress={item.situacao === 'rejeitada' ? () => corrigir(item.id) : undefined}
+            onPress={() => router.push({ pathname: '/despesa', params: { id: item.id } })}
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.itemTitulo}>{nomes.categorias.get(item.categoria_id) ?? 'Despesa'}</Text>
