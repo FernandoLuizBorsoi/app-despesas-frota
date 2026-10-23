@@ -52,13 +52,22 @@ export function acharTotal(textos: string[]): number | null {
   return candidatos[0]?.[0] ?? null;
 }
 
-// Devolve o valor em centavos, ou null se não conseguiu ler.
-export async function lerValorDaFoto(uri: string): Promise<number | null> {
-  if (!isSupported) return null;
-  try {
-    const textos = await extractTextFromImage(uri.replace(/^file:\/\//, ''));
-    return acharTotal(textos);
-  } catch {
-    return null;
+export type Leitura = { centavos: number | null; motivo: string | null };
+
+// Tenta primeiro a foto inteira e, se não der, a reduzida. O motivo ajuda a entender quando falha.
+export async function lerValorDaFoto(...uris: string[]): Promise<Leitura> {
+  if (!isSupported) return { centavos: null, motivo: 'leitura indisponível neste celular' };
+  let motivo = 'nenhum texto encontrado na foto';
+  for (const uri of uris) {
+    try {
+      const textos = await extractTextFromImage(uri.replace(/^file:\/\//, ''));
+      if (textos.length === 0) continue;
+      const centavos = acharTotal(textos);
+      if (centavos !== null) return { centavos, motivo: null };
+      motivo = 'texto lido, mas sem valor reconhecível';
+    } catch (e) {
+      motivo = e instanceof Error ? e.message : String(e);
+    }
   }
+  return { centavos: null, motivo };
 }

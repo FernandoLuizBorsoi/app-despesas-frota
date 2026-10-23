@@ -2,7 +2,7 @@
   "expo": {
     "name": "Despesas Frota",
     "slug": "despesas-frota",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -32,7 +32,9 @@
           "cameraPermission": "O app usa a câmera para fotografar os comprovantes das despesas.",
           "photosPermission": "O app acessa suas fotos para anexar comprovantes já fotografados."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "./plugins/ler-comprovante.js"
     ],
     "scheme": "despesasfrota",
     "owner": "fernandoborsoi",

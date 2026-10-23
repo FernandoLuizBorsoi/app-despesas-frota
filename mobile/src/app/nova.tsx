@@ -15,7 +15,7 @@ import {
 import { cacheCategorias, cacheVeiculos, listarDespesas, salvarDespesa } from '../lib/banco-local';
 import { cores, estilos } from '../lib/estilos';
 import { centavosDeTexto, dataIsoDeTexto, dataTextoDeIso, hojeTexto, numeroDeTexto } from '../lib/formato';
-import { apagarFoto, escolherDaGaleria, fotografarComprovante, PREFIXO_REMOTO } from '../lib/fotos';
+import { apagarFoto, escolherDaGaleria, fotografarComprovante, PREFIXO_REMOTO, type FotoNova } from '../lib/fotos';
 import { lerValorDaFoto } from '../lib/ler-valor';
 import { useSessao } from '../lib/sessao';
 import { BUCKET_COMPROVANTES, supabase } from '../lib/supabase';
@@ -152,13 +152,13 @@ export default function NovaDespesa() {
   }
 
   // Lê o valor da primeira foto, se o motorista ainda não digitou nada.
-  async function lerValor(uri: string) {
+  async function lerValor(foto: FotoNova) {
     setLendoValor(true);
     setAvisoValor(null);
-    const centavos = await lerValorDaFoto(uri);
+    const { centavos, motivo } = await lerValorDaFoto(foto.original, foto.uri);
     setLendoValor(false);
     if (centavos === null) {
-      setAvisoValor('Não consegui ler o valor na foto. Digite o valor.');
+      setAvisoValor(`Não consegui ler o valor na foto (${motivo}). Digite o valor.`);
       return;
     }
     // O motorista pode ter digitado enquanto a foto era lida: aí vale o que ele digitou.
@@ -175,9 +175,9 @@ export default function NovaDespesa() {
     try {
       const novas =
         origem === 'camera'
-          ? [await fotografarComprovante()].filter((f): f is string => f !== null)
+          ? [await fotografarComprovante()].filter((f): f is FotoNova => f !== null)
           : await escolherDaGaleria();
-      setFotos((atuais) => [...atuais, ...novas].slice(0, MAX_FOTOS));
+      setFotos((atuais) => [...atuais, ...novas.map((f) => f.uri)].slice(0, MAX_FOTOS));
       if (novas.length > 0 && !valor.trim()) lerValor(novas[0]);
     } catch (e) {
       Alert.alert('Foto', e instanceof Error ? e.message : 'Não foi possível adicionar a foto.');

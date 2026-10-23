@@ -26,16 +26,19 @@ async function compactarEGuardar(uri: string, largura: number): Promise<string> 
   return arquivo.uri;
 }
 
-export async function fotografarComprovante(): Promise<string | null> {
+// "uri" é a foto reduzida que vai para o servidor; "original" é a foto inteira, melhor para ler o valor.
+export type FotoNova = { uri: string; original: string };
+
+export async function fotografarComprovante(): Promise<FotoNova | null> {
   const permissao = await ImagePicker.requestCameraPermissionsAsync();
   if (!permissao.granted) throw new Error('Permita o uso da câmera para fotografar o comprovante.');
   const resultado = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 1 });
   if (resultado.canceled) return null;
   const foto = resultado.assets[0];
-  return compactarEGuardar(foto.uri, foto.width);
+  return { uri: await compactarEGuardar(foto.uri, foto.width), original: foto.uri };
 }
 
-export async function escolherDaGaleria(): Promise<string[]> {
+export async function escolherDaGaleria(): Promise<FotoNova[]> {
   const resultado = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: 'images',
     allowsMultipleSelection: true,
@@ -43,7 +46,9 @@ export async function escolherDaGaleria(): Promise<string[]> {
     quality: 1,
   });
   if (resultado.canceled) return [];
-  return Promise.all(resultado.assets.map((a) => compactarEGuardar(a.uri, a.width)));
+  return Promise.all(
+    resultado.assets.map(async (a) => ({ uri: await compactarEGuardar(a.uri, a.width), original: a.uri })),
+  );
 }
 
 export async function lerBytes(uri: string): Promise<ArrayBuffer> {

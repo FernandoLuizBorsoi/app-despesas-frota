@@ -1,5 +1,6 @@
 import { Redirect } from 'expo-router';
-import { useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -15,21 +16,45 @@ import { emailDoLogin } from '../lib/login';
 import { useSessao } from '../lib/sessao';
 import { supabase } from '../lib/supabase';
 
+// CPF e senha guardados no cofre do próprio celular, quando o motorista pede para lembrar.
+const CHAVE_LOGIN = 'login-salvo';
+
 export default function Login() {
   const { sessao } = useSessao();
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [entrando, setEntrando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [lembrar, setLembrar] = useState(true);
+
+  useEffect(() => {
+    SecureStore.getItemAsync(CHAVE_LOGIN)
+      .then((salvo) => {
+        if (!salvo) return;
+        const dados = JSON.parse(salvo) as { usuario: string; senha: string };
+        setUsuario(dados.usuario);
+        setSenha(dados.senha);
+      })
+      .catch(() => undefined);
+  }, []);
 
   if (sessao) return <Redirect href="/" />;
 
   async function entrar() {
     setErro(null);
     setEntrando(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: emailDoLogin(usuario), password: senha });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: emailDoLogin(usuario),
+      password: senha,
+    });
     setEntrando(false);
-    if (error) setErro('CPF ou senha incorretos, ou sem internet.');
+    if (error) {
+      setErro('CPF ou senha incorretos, ou sem internet.');
+      return;
+    }
+    if (lembrar)
+      await SecureStore.setItemAsync(CHAVE_LOGIN, JSON.stringify({ usuario, senha })).catch(() => undefined);
+    else await SecureStore.deleteItemAsync(CHAVE_LOGIN).catch(() => undefined);
   }
 
   return (
@@ -63,6 +88,12 @@ export default function Login() {
             onSubmitEditing={entrar}
           />
         </View>
+        <Pressable style={styles.lembrar} onPress={() => setLembrar((l) => !l)} hitSlop={8}>
+          <View style={[styles.caixinha, lembrar && styles.caixinhaMarcada]}>
+            {lembrar && <Text style={styles.marca}>✓</Text>}
+          </View>
+          <Text style={styles.lembrarTexto}>Lembrar CPF e senha neste celular</Text>
+        </Pressable>
         {erro && <Text style={estilos.erro}>{erro}</Text>}
         <Pressable style={estilos.botao} onPress={entrar} disabled={entrando || !usuario || !senha}>
           {entrando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={estilos.botaoTexto}>Entrar</Text>}
@@ -77,4 +108,17 @@ const styles = StyleSheet.create({
   caixa: { gap: 16 },
   titulo: { fontSize: 26, fontWeight: '700', color: cores.primaria },
   subtitulo: { fontSize: 15, color: cores.suave },
+  lembrar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  caixinha: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: cores.primaria,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  caixinhaMarcada: { backgroundColor: cores.primaria },
+  marca: { color: '#FFFFFF', fontWeight: '700' },
+  lembrarTexto: { fontSize: 15, color: cores.texto },
 });
