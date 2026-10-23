@@ -1,5 +1,6 @@
-// Cria o login de um motorista (ou gestor) a partir do painel.
+// Cria o login de um motorista (ou gestor) a partir do painel, ou volta a senha dele para a padrão.
 // Só um gestor ou admin logado pode chamar; o novo usuário entra na empresa de quem chamou.
+// Senha padrão: os 6 primeiros números do CPF.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -52,15 +53,42 @@ Deno.serve(async (req) => {
     return resposta(403, { erro: "Só gestores podem cadastrar pessoas." });
   }
 
-  let corpo: { nome?: string; cpf?: string; email?: string; senha?: string; perfil?: string; telefone?: string };
+  let corpo: {
+    acao?: string;
+    id?: string;
+    nome?: string;
+    cpf?: string;
+    email?: string;
+    senha?: string;
+    perfil?: string;
+    telefone?: string;
+  };
   try {
     corpo = await req.json();
   } catch {
     return resposta(400, { erro: "Dados inválidos." });
   }
+
+  if (corpo.acao === "senha-padrao") {
+    const { data: pessoa } = await admin
+      .from("usuario")
+      .select("cpf, perfil")
+      .eq("id", corpo.id ?? "")
+      .eq("empresa_id", gestor.empresa_id)
+      .maybeSingle();
+    // Só motoristas: a senha de um gestor nunca volta para algo tão fácil de adivinhar.
+    if (!pessoa?.cpf || pessoa.perfil !== "motorista") {
+      return resposta(400, { erro: "Só dá para voltar a senha padrão de motoristas com CPF." });
+    }
+    const { error } = await admin.auth.admin.updateUserById(corpo.id!, { password: pessoa.cpf.slice(0, 6) });
+    if (error) return resposta(500, { erro: error.message });
+    return resposta(200, { ok: true });
+  }
+
   const nome = corpo.nome?.trim();
   const cpf = (corpo.cpf ?? "").replace(/\D/g, "");
-  const senha = corpo.senha ?? "";
+  // Sem senha informada, usa a padrão.
+  const senha = corpo.senha || cpf.slice(0, 6);
   const perfil = corpo.perfil === "gestor" ? "gestor" : "motorista";
   if (!nome) return resposta(400, { erro: "Informe o nome." });
   if (!cpfValido(cpf)) return resposta(400, { erro: "CPF inválido. Confira os números." });
