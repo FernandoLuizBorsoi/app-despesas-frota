@@ -3,6 +3,7 @@
 App Android para os motoristas lançarem despesas (combustível, pedágio, manutenção etc.) com foto do comprovante. Funciona sem internet: a despesa fica guardada no celular e é enviada quando o sinal volta.
 
 - `mobile/`: app do motorista (React Native + Expo)
+- `painel/`: site do gestor com lista de despesas, fotos, relatórios e cadastro de veículos (veja `painel/README.md`)
 - `supabase/`: banco de dados, regras de acesso e armazenamento das fotos
 
 ## O que o app faz hoje
@@ -14,7 +15,7 @@ App Android para os motoristas lançarem despesas (combustível, pedágio, manut
 - Envio automático ao abrir o app, ao voltar para ele e quando a internet volta. Também dá para puxar a lista para baixo e enviar na hora.
 - Aviso quando o km informado é menor que o último registrado para o veículo.
 
-Ainda não tem: painel web do gestor, relatórios e aprovação de despesas.
+O painel do gestor mostra as despesas com as fotos, relatórios por veículo, categoria e motorista (com custo por km e consumo km/l) e exporta para Excel. Ainda não tem aprovação de despesas.
 
 ## Como colocar para funcionar
 
@@ -23,7 +24,7 @@ Ainda não tem: painel web do gestor, relatórios e aprovação de despesas.
 1. Crie uma conta e um projeto em [supabase.com](https://supabase.com) (o plano gratuito atende 28 motoristas).
 2. No projeto, abra **SQL Editor**, cole o conteúdo de `supabase/migrations/20261023000000_inicial.sql` e clique em **Run**.
 3. Em `supabase/seed.sql`, troque `Minha Frota` pelo nome da empresa, cole no SQL Editor e rode. Isso cria a empresa e as categorias.
-4. Cadastre os veículos (troque as placas e o id da empresa, que aparece na tabela `empresa`):
+4. Cadastre os veículos. Depois que o gestor existir (passo 5), dá para fazer isso pelo painel, na tela **Veículos**. Ou direto no SQL Editor (troque as placas e o id da empresa, que aparece na tabela `empresa`):
 
    ```sql
    insert into veiculo (empresa_id, placa, modelo) values
@@ -58,6 +59,6 @@ Para desenvolver: `npx expo run:android` com um celular ligado por cabo ou um em
 ## Verificações
 
 ```sh
-cd mobile
-npx tsc --noEmit
+(cd mobile && npx tsc --noEmit)
+(cd painel && npx tsc --noEmit && npm run lint && npm run build)
 ```
