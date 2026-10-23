@@ -10,6 +10,7 @@ const MENU = [
   { href: "/despesas", rotulo: "Despesas" },
   { href: "/relatorios", rotulo: "Relatórios" },
   { href: "/veiculos", rotulo: "Veículos" },
+  { href: "/motoristas", rotulo: "Motoristas" },
 ];
 
 type Estado =

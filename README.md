@@ -3,7 +3,7 @@
 App Android para os motoristas lançarem despesas (combustível, pedágio, manutenção etc.) com foto do comprovante. Funciona sem internet: a despesa fica guardada no celular e é enviada quando o sinal volta.
 
 - `mobile/`: app do motorista (React Native + Expo)
-- `painel/`: site do gestor com lista de despesas, fotos, relatórios e cadastro de veículos (veja `painel/README.md`)
+- `painel/`: site do gestor com lista de despesas, fotos, relatórios e cadastro de veículos e motoristas (veja `painel/README.md`)
 - `supabase/`: banco de dados, regras de acesso e armazenamento das fotos
 
 ## O que o app faz hoje
@@ -32,14 +32,15 @@ O painel do gestor mostra as despesas com as fotos, relatórios por veículo, ca
      ('ID-DA-EMPRESA', 'XYZ4E56', 'Fiat Fiorino');
    ```
 
-5. Para cada motorista, crie o login em **Authentication > Users > Add user** (e-mail e senha) e depois ligue-o à empresa:
+5. Crie o primeiro gestor em **Authentication > Users > Add user** (e-mail e senha, com confirmação automática) e ligue-o à empresa:
 
    ```sql
-   insert into usuario (id, empresa_id, nome, perfil) values
-     ('ID-DO-USUARIO-NO-AUTH', 'ID-DA-EMPRESA', 'João da Silva', 'motorista');
+   insert into usuario (id, empresa_id, nome, perfil)
+   select u.id, (select id from empresa limit 1), 'Nome do Gestor', 'gestor'
+   from auth.users u where u.email = 'email-do-gestor@exemplo.com';
    ```
 
-   Para o gestor, use `perfil` = `'gestor'`.
+6. Publique a função que cadastra motoristas: `supabase functions deploy criar-motorista --no-verify-jwt` (ela confere sozinha se quem chama é gestor). Depois disso, os motoristas são cadastrados pelo painel, na tela **Motoristas**.
 
 ### 2. App
 
