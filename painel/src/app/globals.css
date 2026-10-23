@@ -1,0 +1,271 @@
+:root {
+  --primaria: #1f5fad;
+  --primaria-escura: #174a87;
+  --fundo: #f4f6f9;
+  --cartao: #ffffff;
+  --texto: #1b1f24;
+  --suave: #5e6773;
+  --borda: #d5dae1;
+  --erro: #b42318;
+  --aviso: #b26a00;
+  --barra: #9fbbe0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 15px;
+}
+
+a {
+  color: var(--primaria);
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0 0 16px;
+}
+
+h2 {
+  font-size: 17px;
+  margin: 0 0 12px;
+}
+
+.topo {
+  background: var(--primaria);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 24px;
+  height: 56px;
+  flex-wrap: wrap;
+}
+
+.topo .marca {
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.topo nav {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.topo nav a,
+.topo button {
+  color: #fff;
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.topo nav a.ativo,
+.topo nav a:hover,
+.topo button:hover {
+  background: var(--primaria-escura);
+}
+
+main {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cartao {
+  background: var(--cartao);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--suave);
+}
+
+input,
+select {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--texto);
+  min-width: 140px;
+}
+
+button.botao {
+  font: inherit;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--primaria);
+  background: var(--primaria);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.botao.secundario {
+  background: #fff;
+  color: var(--primaria);
+}
+
+button.botao:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--borda);
+  vertical-align: middle;
+}
+
+th {
+  font-size: 13px;
+  color: var(--suave);
+  font-weight: 600;
+}
+
+td.numero,
+th.numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+tr.clicavel {
+  cursor: pointer;
+}
+
+tr.clicavel:hover {
+  background: #eef3fa;
+}
+
+.tabela-rolagem {
+  overflow-x: auto;
+}
+
+.resumo {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.resumo .cartao {
+  flex: 1;
+  min-width: 180px;
+  margin: 0;
+}
+
+.resumo .valor {
+  font-size: 24px;
+  font-weight: 700;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rotulo-suave {
+  color: var(--suave);
+  font-size: 13px;
+}
+
+.erro {
+  color: var(--erro);
+}
+
+.barra {
+  height: 10px;
+  background: var(--barra);
+  border-radius: 3px;
+}
+
+.grade-relatorios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.fundo-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 10;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 10px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 20px;
+}
+
+.fotos {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.fotos img {
+  max-width: 100%;
+  max-height: 60vh;
+  border-radius: 6px;
+  border: 1px solid var(--borda);
+}
+
+.centro {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.login {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
