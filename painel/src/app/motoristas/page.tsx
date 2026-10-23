@@ -81,7 +81,7 @@ export default function Motoristas() {
 
   async function senhaPadrao(p: Pessoa) {
     const padrao = (p.cpf ?? "").slice(0, 6);
-    if (!confirm(`Voltar a senha de ${p.nome} para ${padrao} (6 primeiros números do CPF)?`)) return;
+    if (!confirm(`Gerar nova senha para ${p.nome}? A senha vai ser ${padrao} (6 primeiros números do CPF).`)) return;
     setErro(null);
     setAviso(null);
     const { data, error } = await supabase.functions.invoke("criar-motorista", {
@@ -92,7 +92,7 @@ export default function Motoristas() {
       setErro(corpo?.erro ?? "Não foi possível trocar a senha. Tente de novo.");
       return;
     }
-    setAviso(`A senha de ${p.nome} agora é ${padrao}.`);
+    setAviso(`Nova senha de ${p.nome}: ${padrao}.`);
   }
 
   async function alternarAtivo(p: Pessoa) {
@@ -169,7 +169,7 @@ export default function Motoristas() {
                 <td className="acoes">
                   {p.cpf && p.perfil === "motorista" && (
                     <button className="botao secundario" onClick={() => senhaPadrao(p)}>
-                      Senha padrão
+                      Gerar nova senha
                     </button>
                   )}
                   <button className="botao secundario" onClick={() => alternarAtivo(p)}>
@@ -182,7 +182,7 @@ export default function Motoristas() {
         </table>
         <p className="rotulo-suave">
           Quem for desativado não consegue mais lançar despesas, mas o histórico continua nos relatórios. Se um
-          motorista esquecer a senha, use Senha padrão: ela volta a ser os 6 primeiros números do CPF.
+          motorista esquecer a senha, use Gerar nova senha: ela passa a ser os 6 primeiros números do CPF.
         </p>
       </div>
     </>
