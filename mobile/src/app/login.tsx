@@ -11,12 +11,13 @@ import {
   View,
 } from 'react-native';
 import { cores, estilos } from '../lib/estilos';
+import { emailDoLogin } from '../lib/login';
 import { useSessao } from '../lib/sessao';
 import { supabase } from '../lib/supabase';
 
 export default function Login() {
   const { sessao } = useSessao();
-  const [email, setEmail] = useState('');
+  const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [entrando, setEntrando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -26,9 +27,9 @@ export default function Login() {
   async function entrar() {
     setErro(null);
     setEntrando(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha });
+    const { error } = await supabase.auth.signInWithPassword({ email: emailDoLogin(usuario), password: senha });
     setEntrando(false);
-    if (error) setErro('E-mail ou senha incorretos, ou sem internet.');
+    if (error) setErro('CPF ou senha incorretos, ou sem internet.');
   }
 
   return (
@@ -38,16 +39,17 @@ export default function Login() {
     >
       <View style={styles.caixa}>
         <Text style={styles.titulo}>Despesas da Frota</Text>
-        <Text style={styles.subtitulo}>Entre com o e-mail e a senha que o gestor passou.</Text>
+        <Text style={styles.subtitulo}>Entre com o seu CPF e a senha que o gestor passou.</Text>
         <View>
-          <Text style={estilos.rotulo}>E-mail</Text>
+          <Text style={estilos.rotulo}>CPF</Text>
           <TextInput
             style={estilos.campo}
-            value={email}
-            onChangeText={setEmail}
+            value={usuario}
+            onChangeText={setUsuario}
             autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
+            autoComplete="username"
+            keyboardType="number-pad"
+            placeholder="Só os números"
           />
         </View>
         <View>
@@ -62,7 +64,7 @@ export default function Login() {
           />
         </View>
         {erro && <Text style={estilos.erro}>{erro}</Text>}
-        <Pressable style={estilos.botao} onPress={entrar} disabled={entrando || !email || !senha}>
+        <Pressable style={estilos.botao} onPress={entrar} disabled={entrando || !usuario || !senha}>
           {entrando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={estilos.botaoTexto}>Entrar</Text>}
         </Pressable>
       </View>

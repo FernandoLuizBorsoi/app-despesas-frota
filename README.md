@@ -8,7 +8,7 @@ App Android para os motoristas lançarem despesas (combustível, pedágio, manut
 
 ## O que o app faz hoje
 
-- Login com e-mail e senha.
+- Login com CPF e senha (o gestor cadastra cada motorista no painel).
 - Nova despesa: foto do comprovante (câmera ou galeria, até 5), categoria, veículo, valor, data, km do odômetro, litros (combustível), forma de pagamento e observação.
 - As fotos são reduzidas para cerca de 300 KB antes de enviar, para gastar pouco dado móvel.
 - Lista das despesas do motorista, mostrando o que ainda aguarda envio.
@@ -40,7 +40,7 @@ O painel do gestor mostra as despesas com as fotos, relatórios por veículo, ca
    from auth.users u where u.email = 'email-do-gestor@exemplo.com';
    ```
 
-6. Publique a função que cadastra motoristas: `supabase functions deploy criar-motorista --no-verify-jwt` (ela confere sozinha se quem chama é gestor). Depois disso, os motoristas são cadastrados pelo painel, na tela **Motoristas**.
+6. Publique a função que cadastra motoristas: `supabase functions deploy criar-motorista --no-verify-jwt` (ela confere sozinha se quem chama é gestor). Depois disso, os motoristas são cadastrados pelo painel, na tela **Motoristas**, com CPF e senha. Por baixo, o login do Supabase de cada motorista usa o e-mail `<cpf>@cpf.invalid` (domínio reservado, que nunca recebe mensagens).
 
 ### 2. App
 

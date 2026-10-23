@@ -4,6 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { emailDoLogin } from "@/lib/login";
 import { supabase } from "@/lib/supabase";
 
 const MENU = [
@@ -82,9 +83,9 @@ function Login() {
     e.preventDefault();
     setErro(null);
     setEntrando(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha });
+    const { error } = await supabase.auth.signInWithPassword({ email: emailDoLogin(email), password: senha });
     setEntrando(false);
-    if (error) setErro("E-mail ou senha incorretos.");
+    if (error) setErro("E-mail/CPF ou senha incorretos.");
   }
 
   return (
@@ -92,8 +93,8 @@ function Login() {
       <form className="login cartao" onSubmit={entrar}>
         <h1>Despesas da Frota</h1>
         <label>
-          E-mail
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+          E-mail ou CPF
+          <input value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
         </label>
         <label>
           Senha
