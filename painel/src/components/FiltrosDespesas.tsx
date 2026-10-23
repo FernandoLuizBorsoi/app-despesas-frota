@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { carregarOpcoes, hoje, primeiroDiaDoMes, type Filtros, type Opcao } from "@/lib/dados";
+import { carregarOpcoes, hoje, NOMES_SITUACAO, primeiroDiaDoMes, type Filtros, type Opcao } from "@/lib/dados";
 
 export const FILTROS_INICIAIS: Filtros = {
   de: primeiroDiaDoMes(),
@@ -9,7 +9,10 @@ export const FILTROS_INICIAIS: Filtros = {
   motoristaId: "",
   veiculoId: "",
   categoriaId: "",
+  situacao: "",
 };
+
+const SITUACOES: Opcao[] = Object.entries(NOMES_SITUACAO).map(([id, nome]) => ({ id, nome }));
 
 export function FiltrosDespesas(props: {
   filtros: Filtros;
@@ -57,6 +60,7 @@ export function FiltrosDespesas(props: {
       {selecao("Motorista", "motoristaId", opcoes.motoristas)}
       {selecao("Veículo", "veiculoId", opcoes.veiculos)}
       {selecao("Categoria", "categoriaId", opcoes.categorias)}
+      {selecao("Situação", "situacao", SITUACOES)}
       {props.children}
     </div>
   );

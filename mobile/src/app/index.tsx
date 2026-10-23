@@ -6,6 +6,7 @@ import { cores, estilos } from '../lib/estilos';
 import { dataTextoDeIso, formatarReais, mesAtual, nomeDoMes, somarMeses } from '../lib/formato';
 import { useSessao } from '../lib/sessao';
 import { supabase } from '../lib/supabase';
+import type { Situacao } from '../lib/tipos';
 
 // Despesa como aparece na lista: as do servidor e as que ainda estão só no celular.
 type ItemLista = {
@@ -18,6 +19,8 @@ type ItemLista = {
   fotos: number;
   enviada: boolean;
   erro_envio: string | null;
+  situacao: Situacao | null; // null enquanto está só no celular
+  motivo_rejeicao: string | null;
 };
 
 type LinhaServidor = {
@@ -28,6 +31,16 @@ type LinhaServidor = {
   veiculo_id: string;
   km_odometro: number | null;
   comprovante: { count: number }[];
+  situacao: Situacao;
+  motivo_rejeicao: string | null;
+};
+
+type Rejeitada = {
+  id: string;
+  data: string;
+  valor: number;
+  categoria_id: string;
+  motivo_rejeicao: string | null;
 };
 
 // Junta as despesas do mês que estão no servidor com as do celular. Sem internet, mostra só as do celular.
@@ -37,7 +50,9 @@ async function carregarMes(motoristaId: string, mes: string): Promise<ItemLista[
 
   const { data } = await supabase
     .from('despesa')
-    .select('id, data, valor, categoria_id, veiculo_id, km_odometro, comprovante(count)')
+    .select(
+      'id, data, valor, categoria_id, veiculo_id, km_odometro, comprovante(count), situacao, motivo_rejeicao',
+    )
     .eq('motorista_id', motoristaId)
     .gte('data', `${mes}-01`)
     .lt('data', `${somarMeses(mes, 1)}-01`);
@@ -52,14 +67,33 @@ async function carregarMes(motoristaId: string, mes: string): Promise<ItemLista[
       fotos: d.comprovante[0]?.count ?? 0,
       enviada: true,
       erro_envio: null,
+      situacao: d.situacao,
+      motivo_rejeicao: d.motivo_rejeicao,
     });
   }
   for (const d of locais) {
     if (d.enviada && porId.has(d.id)) continue;
-    porId.set(d.id, { ...d, fotos: d.fotos.length });
+    porId.set(d.id, { ...d, fotos: d.fotos.length, situacao: null, motivo_rejeicao: null });
   }
   return [...porId.values()].sort((a, b) => b.data.localeCompare(a.data));
 }
+
+// Despesas que o gestor devolveu para corrigir, de qualquer mês.
+async function carregarRejeitadas(motoristaId: string): Promise<Rejeitada[]> {
+  const { data } = await supabase
+    .from('despesa')
+    .select('id, data, valor, categoria_id, motivo_rejeicao')
+    .eq('motorista_id', motoristaId)
+    .eq('situacao', 'rejeitada')
+    .order('data');
+  return (data ?? []) as Rejeitada[];
+}
+
+const TEXTO_SITUACAO: Record<Situacao, string> = {
+  pendente: 'Aguardando aprovação',
+  aprovada: 'Aprovada ✓',
+  rejeitada: 'Precisa de ajuste',
+};
 
 export default function MinhasDespesas() {
   const router = useRouter();
@@ -68,6 +102,7 @@ export default function MinhasDespesas() {
   const [mes, setMes] = useState(mesAtual);
   const [despesas, setDespesas] = useState<ItemLista[]>([]);
   const [pendentes, setPendentes] = useState(0);
+  const [rejeitadas, setRejeitadas] = useState<Rejeitada[]>([]);
   const [nomes, setNomes] = useState<{ categorias: Map<string, string>; placas: Map<string, string> }>({
     categorias: new Map(),
     placas: new Map(),
@@ -81,9 +116,13 @@ export default function MinhasDespesas() {
         listarPendentes(),
         cacheCategorias.ler(),
         cacheVeiculos.ler(),
-      ]).then(([lista, naoEnviadas, categorias, veiculos]) => {
+        carregarRejeitadas(perfil.id).catch(() => []),
+      ]).then(([lista, naoEnviadas, categorias, veiculos, devolvidas]) => {
         setDespesas(lista);
         setPendentes(naoEnviadas.length);
+        // As que já foram corrigidas e esperam internet não precisam mais de aviso.
+        const corrigidas = new Set(naoEnviadas.map((d) => d.id));
+        setRejeitadas(devolvidas.filter((d) => !corrigidas.has(d.id)));
         setNomes({
           categorias: new Map((categorias ?? []).map((c) => [c.id, c.nome])),
           placas: new Map((veiculos ?? []).map((v) => [v.id, v.placa])),
@@ -124,6 +163,7 @@ export default function MinhasDespesas() {
   }
 
   const ehMesAtual = mes === mesAtual();
+  const corrigir = (id: string) => router.push({ pathname: '/nova', params: { id } });
 
   const cabecalho = (
     <View style={{ gap: 12 }}>
@@ -137,6 +177,25 @@ export default function MinhasDespesas() {
               : 'Tudo enviado'}
         </Text>
       </View>
+
+      {rejeitadas.length > 0 && (
+        <View style={styles.alerta}>
+          <Text style={styles.alertaTitulo}>
+            ⚠ {rejeitadas.length === 1 ? '1 despesa precisa' : `${rejeitadas.length} despesas precisam`} de
+            ajuste
+          </Text>
+          {rejeitadas.map((d) => (
+            <Pressable key={d.id} style={styles.alertaItem} onPress={() => corrigir(d.id)}>
+              <Text style={styles.alertaLinha}>
+                {dataTextoDeIso(d.data)} · {nomes.categorias.get(d.categoria_id) ?? 'Despesa'} ·{' '}
+                {formatarReais(Math.round(d.valor * 100))}
+              </Text>
+              {d.motivo_rejeicao && <Text style={styles.alertaMotivo}>Gestor: {d.motivo_rejeicao}</Text>}
+              <Text style={styles.alertaAcao}>Toque para corrigir ›</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       <View style={styles.seletorMes}>
         <Pressable onPress={() => setMes((m) => somarMeses(m, -1))} hitSlop={12} style={styles.seta}>
@@ -187,7 +246,10 @@ export default function MinhasDespesas() {
         refreshControl={<RefreshControl refreshing={sincronizando} onRefresh={sincronizarAgora} />}
         ListEmptyComponent={<Text style={styles.vazio}>Nenhuma despesa neste mês.</Text>}
         renderItem={({ item }) => (
-          <View style={styles.item}>
+          <Pressable
+            style={[styles.item, item.situacao === 'rejeitada' && styles.itemRejeitado]}
+            onPress={item.situacao === 'rejeitada' ? () => corrigir(item.id) : undefined}
+          >
             <View style={{ flex: 1 }}>
               <Text style={styles.itemTitulo}>{nomes.categorias.get(item.categoria_id) ?? 'Despesa'}</Text>
               <Text style={styles.itemDetalhe}>
@@ -202,9 +264,15 @@ export default function MinhasDespesas() {
                     : 'Aguardando envio'}
                 </Text>
               )}
+              {item.situacao && (
+                <Text style={[styles.itemSituacao, styles[item.situacao]]}>
+                  {TEXTO_SITUACAO[item.situacao]}
+                  {item.situacao === 'rejeitada' && item.motivo_rejeicao ? `: ${item.motivo_rejeicao}` : ''}
+                </Text>
+              )}
             </View>
             <Text style={styles.itemValor}>{formatarReais(item.valor_centavos)}</Text>
-          </View>
+          </Pressable>
         )}
       />
       <Pressable style={[estilos.botao, styles.flutuante]} onPress={() => router.push('/nova')}>
@@ -250,6 +318,24 @@ const styles = StyleSheet.create({
   itemTitulo: { fontSize: 16, fontWeight: '600', color: cores.texto },
   itemDetalhe: { fontSize: 13, color: cores.suave, marginTop: 2 },
   itemPendente: { fontSize: 13, color: cores.aviso, marginTop: 4 },
+  itemRejeitado: { borderWidth: 1, borderColor: cores.erro },
+  itemSituacao: { fontSize: 13, marginTop: 4 },
+  pendente: { color: cores.suave },
+  aprovada: { color: cores.sucesso },
+  rejeitada: { color: cores.erro, fontWeight: '600' },
+  alerta: {
+    backgroundColor: '#FDECEA',
+    borderColor: cores.erro,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    gap: 8,
+  },
+  alertaTitulo: { fontSize: 16, fontWeight: '700', color: cores.erro },
+  alertaItem: { backgroundColor: '#FFFFFF', borderRadius: 6, padding: 10, gap: 2 },
+  alertaLinha: { fontSize: 15, fontWeight: '600', color: cores.texto },
+  alertaMotivo: { fontSize: 14, color: cores.texto },
+  alertaAcao: { fontSize: 14, color: cores.primaria, fontWeight: '600', marginTop: 2 },
   itemValor: { fontSize: 16, fontWeight: '700', color: cores.texto },
   flutuante: { position: 'absolute', left: 16, right: 16, bottom: 24 },
 });

@@ -8,7 +8,7 @@ import {
   marcarEnviada,
   marcarErro,
 } from './banco-local';
-import { lerBytes } from './fotos';
+import { lerBytes, PREFIXO_REMOTO } from './fotos';
 import { BUCKET_COMPROVANTES, supabase } from './supabase';
 import type { Categoria, DespesaLocal, Perfil, Veiculo } from './tipos';
 
@@ -42,8 +42,13 @@ export async function atualizarCadastros(): Promise<void> {
 
 async function enviarDespesa(d: DespesaLocal, perfil: Perfil): Promise<void> {
   const caminhos: string[] = [];
-  for (const [ordem, uri] of d.fotos.entries()) {
-    const caminho = `${perfil.empresa_id}/${perfil.id}/${d.id}/${ordem}.jpg`;
+  for (const uri of d.fotos) {
+    if (uri.startsWith(PREFIXO_REMOTO)) {
+      caminhos.push(uri.slice(PREFIXO_REMOTO.length));
+      continue;
+    }
+    // O nome do arquivo no celular é único, então reenviar não sobrescreve outra foto da despesa.
+    const caminho = `${perfil.empresa_id}/${perfil.id}/${d.id}/${uri.split('/').pop()}`;
     const { error } = await supabase.storage
       .from(BUCKET_COMPROVANTES)
       .upload(caminho, await lerBytes(uri), { contentType: 'image/jpeg', upsert: true });
@@ -75,6 +80,13 @@ async function enviarDespesa(d: DespesaLocal, perfil: Perfil): Promise<void> {
       );
     if (error) throw error;
   }
+  // Fotos que o motorista removeu ao corrigir a despesa.
+  const { error: erroSobra } = await supabase
+    .from('comprovante')
+    .delete()
+    .eq('despesa_id', d.id)
+    .gte('ordem', caminhos.length);
+  if (erroSobra) throw erroSobra;
 }
 
 let emAndamento: Promise<number> | null = null;
@@ -91,8 +103,14 @@ export function sincronizar(perfil: Perfil): Promise<number> {
           await enviarDespesa(d, perfil);
           await marcarEnviada(d.id);
         } catch (e) {
+          const mensagem = e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e);
+          // Já estava no servidor e o gestor aprovou: não há mais nada a enviar.
+          if (mensagem.includes('já foi aprovada')) {
+            await marcarEnviada(d.id);
+            continue;
+          }
           faltam++;
-          await marcarErro(d.id, e instanceof Error ? e.message : String(e));
+          await marcarErro(d.id, mensagem);
         }
       }
       return faltam;

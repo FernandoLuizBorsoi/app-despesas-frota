@@ -32,8 +32,10 @@ export type DespesaLocal = {
   litros: number | null;
   forma_pagamento: string | null;
   observacao: string | null;
-  fotos: string[]; // caminhos locais das fotos já compactadas
+  fotos: string[]; // caminhos locais das fotos já compactadas, ou PREFIXO_REMOTO + caminho no servidor
   enviada: boolean;
   erro_envio: string | null;
   criado_em: string;
 };
+
+export type Situacao = 'pendente' | 'aprovada' | 'rejeitada';

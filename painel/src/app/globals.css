@@ -309,3 +309,58 @@ td.acoes {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+.selo {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.selo.pendente {
+  background: #fff4e0;
+  color: var(--aviso);
+}
+
+.selo.aprovada {
+  background: #e3f4e8;
+  color: #1e7b3a;
+}
+
+.selo.rejeitada {
+  background: #fde8e6;
+  color: var(--erro);
+}
+
+.cartao.clicavel {
+  cursor: pointer;
+}
+
+.avaliacao {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.avaliacao textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 8px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  color: var(--texto);
+}
+
+.botoes {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+button.botao.perigo {
+  background: var(--erro);
+  border-color: var(--erro);
+}
