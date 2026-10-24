@@ -112,9 +112,35 @@ export function hoje(): string {
 
 export type Empresa = { id: string; nome: string; logo_caminho: string | null };
 
+// A empresa de quem está logado. O administrador geral enxerga todas, por isso filtra pelo usuário.
 export async function carregarEmpresa(): Promise<Empresa | null> {
-  const { data } = await supabase.from("empresa").select("id, nome, logo_caminho").maybeSingle();
-  return data as Empresa | null;
+  const { data: sessao } = await supabase.auth.getSession();
+  const id = sessao.session?.user.id;
+  if (!id) return null;
+  const { data } = await supabase
+    .from("usuario")
+    .select("empresa:empresa_id (id, nome, logo_caminho)")
+    .eq("id", id)
+    .maybeSingle();
+  return (data?.empresa as unknown as Empresa) ?? null;
+}
+
+// Só o administrador geral recebe a lista (as regras do banco filtram para os demais).
+export async function listarEmpresas(): Promise<{ id: string; nome: string }[]> {
+  const { data, error } = await supabase.from("empresa").select("id, nome").order("nome");
+  if (error) throw error;
+  return data;
+}
+
+export async function trocarEmpresa(empresaId: string) {
+  const { error } = await supabase.rpc("trocar_empresa", { p_empresa: empresaId });
+  if (error) throw error;
+}
+
+export async function criarEmpresa(nome: string): Promise<string> {
+  const { data, error } = await supabase.rpc("criar_empresa", { p_nome: nome });
+  if (error) throw error;
+  return data as string;
 }
 
 export function linkDaLogo(caminho: string | null): string | null {
