@@ -31,6 +31,7 @@ type Estado =
       empresa: string;
       empresaId: string | null;
       logo: string | null;
+      marcaDagua: boolean;
       // Preenchida só para o administrador geral.
       empresas: { id: string; nome: string; ativa: boolean }[] | null;
     };
@@ -55,6 +56,7 @@ export function Painel({ children }: { children: ReactNode }) {
         empresa: empresa?.nome ?? "Despesas da Frota",
         empresaId: empresa?.id ?? null,
         logo: linkDaLogo(empresa?.logo_caminho ?? null),
+        marcaDagua: Boolean(empresa?.marca_dagua),
         empresas,
       });
     }
@@ -124,6 +126,10 @@ export function Painel({ children }: { children: ReactNode }) {
         <button onClick={() => supabase.auth.signOut()}>Sair</button>
       </header>
       <main>{children}</main>
+      {estado.marcaDagua && estado.logo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="marca-dagua" src={estado.logo} alt="" aria-hidden />
+      )}
     </>
   );
 }

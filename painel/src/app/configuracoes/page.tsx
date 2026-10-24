@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { carregarEmpresa, linkDaLogo, renomearEmpresa, trocarLogo, type Empresa } from "@/lib/dados";
+import { carregarEmpresa, ligarMarcaDagua, linkDaLogo, renomearEmpresa, trocarLogo, type Empresa } from "@/lib/dados";
 
 const TAMANHO_MAXIMO = 2 * 1024 * 1024;
 
@@ -104,6 +104,28 @@ export default function Configuracoes() {
             </button>
           )}
         </div>
+        {logo && (
+          <label className="opcao-marca">
+            <input
+              type="checkbox"
+              checked={empresa.marca_dagua}
+              disabled={salvando}
+              onChange={async (e) => {
+                const ligada = e.target.checked;
+                setSalvando(true);
+                setErro(null);
+                try {
+                  await ligarMarcaDagua(empresa, ligada);
+                  window.location.reload();
+                } catch (erro) {
+                  setErro(erro instanceof Error ? erro.message : "Não foi possível salvar.");
+                  setSalvando(false);
+                }
+              }}
+            />
+            Usar a logo como marca d&apos;água (bem clarinha no fundo do painel e da tela inicial do app)
+          </label>
+        )}
         {erro && <p className="erro">{erro}</p>}
       </div>
     </>

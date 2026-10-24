@@ -98,6 +98,12 @@ export const cacheLogo = {
   gravar: (url: string | null) => gravarCache('logo', url),
 };
 
+// Mostrar a logo bem clarinha no fundo da tela inicial (ligado pelo gestor em Configurações).
+export const cacheMarcaDagua = {
+  ler: async () => (await lerCache<boolean>('marca-dagua')) ?? false,
+  gravar: (ligada: boolean) => gravarCache('marca-dagua', ligada),
+};
+
 // Despesas excluídas pelo gestor cujo aviso o motorista já viu.
 export const cacheExclusoesVistas = {
   ler: async () => (await lerCache<string[]>('exclusoes-vistas')) ?? [],
