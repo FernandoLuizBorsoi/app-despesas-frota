@@ -22,7 +22,7 @@ export type Despesa = {
   motorista_id: string;
   veiculo_id: string;
   categoria_id: string;
-  motorista: { nome: string } | null;
+  motorista: { nome: string; foto_caminho: string | null } | null;
   veiculo: { placa: string } | null;
   categoria: { nome: string } | null;
   comprovante: { caminho: string; ordem: number }[];
@@ -66,7 +66,7 @@ export async function buscarDespesas(f: Filtros): Promise<Despesa[]> {
     .from("despesa")
     .select(
       "id, data, valor, km_odometro, litros, forma_pagamento, observacao, motorista_id, veiculo_id, categoria_id," +
-        " motorista:usuario!despesa_motorista_id_fkey(nome), veiculo:veiculo(placa), categoria:categoria(nome), comprovante(caminho, ordem)," +
+        " motorista:usuario!despesa_motorista_id_fkey(nome, foto_caminho), veiculo:veiculo(placa), categoria:categoria(nome), comprovante(caminho, ordem)," +
         " situacao, motivo_rejeicao",
     )
     .gte("data", f.de)
@@ -132,4 +132,21 @@ export async function trocarLogo(empresa: Empresa, arquivo: File | null) {
   }
   const { error } = await supabase.from("empresa").update({ logo_caminho: caminho }).eq("id", empresa.id);
   if (error) throw error;
+}
+
+// Fotos dos motoristas (bucket privado): endereços temporários para mostrar na tela.
+export async function linksDasFotosDeUsuarios(caminhos: string[]): Promise<Map<string, string>> {
+  if (caminhos.length === 0) return new Map();
+  const { data } = await supabase.storage.from("fotos-usuarios").createSignedUrls(caminhos, 60 * 60);
+  return new Map((data ?? []).map((d, i) => [caminhos[i], d.signedUrl ?? ""]));
+}
+
+export async function enviarFotoUsuario(empresaId: string, usuarioId: string, arquivo: File) {
+  const caminho = `${empresaId}/${usuarioId}/foto-${Date.now()}.jpg`;
+  const { error } = await supabase.storage
+    .from("fotos-usuarios")
+    .upload(caminho, arquivo, { contentType: arquivo.type || "image/jpeg" });
+  if (error) throw error;
+  const { error: erroFoto } = await supabase.rpc("definir_foto", { p_usuario: usuarioId, p_caminho: caminho });
+  if (erroFoto) throw erroFoto;
 }

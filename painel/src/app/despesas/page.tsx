@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { FILTROS_INICIAIS, FiltrosDespesas } from "@/components/FiltrosDespesas";
-import { avaliarDespesa, linksDasFotos, NOMES_SITUACAO, type Despesa, type Filtros } from "@/lib/dados";
-import { baixarCsv, dataBr, numero, reais } from "@/lib/formato";
+import {
+  avaliarDespesa,
+  linksDasFotos,
+  linksDasFotosDeUsuarios,
+  NOMES_SITUACAO,
+  type Despesa,
+  type Filtros,
+} from "@/lib/dados";
+import { baixarCsv, dataBr, iniciais, numero, reais } from "@/lib/formato";
 import { useDespesas } from "@/lib/useDespesas";
 
 export default function Despesas() {
@@ -127,6 +134,7 @@ function DetalheDespesa({
   aoAvaliar: () => void;
 }) {
   const [fotos, setFotos] = useState<{ url: string; pdf: boolean }[] | null>(null);
+  const [fotoMotorista, setFotoMotorista] = useState<string | null>(null);
   // Qual pedido o gestor está escrevendo: devolver para o motorista corrigir ou excluir.
   const [pedido, setPedido] = useState<"rejeitada" | "excluida" | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -148,6 +156,11 @@ function DetalheDespesa({
       setSalvando(false);
     }
   }
+
+  useEffect(() => {
+    const caminho = d.motorista?.foto_caminho;
+    if (caminho) linksDasFotosDeUsuarios([caminho]).then((m) => setFotoMotorista(m.get(caminho) || null));
+  }, [d]);
 
   useEffect(() => {
     const caminhos = [...d.comprovante].sort((a, b) => a.ordem - b.ordem).map((c) => c.caminho);
@@ -172,6 +185,17 @@ function DetalheDespesa({
           <button className="botao secundario" onClick={aoFechar}>
             Fechar
           </button>
+        </div>
+        <div className="motorista-detalhe">
+          <span className="avatar grande">
+            {fotoMotorista ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={fotoMotorista} alt={d.motorista?.nome ?? ""} />
+            ) : (
+              iniciais(d.motorista?.nome ?? "?")
+            )}
+          </span>
+          <strong>{d.motorista?.nome}</strong>
         </div>
         <table>
           <tbody>

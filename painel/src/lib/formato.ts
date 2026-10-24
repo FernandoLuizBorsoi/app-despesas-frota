@@ -26,3 +26,13 @@ export function baixarCsv(nomeArquivo: string, cabecalho: string[], linhas: (str
   link.click();
   URL.revokeObjectURL(link.href);
 }
+
+// Letras do nome para o círculo de quem ainda não tem foto.
+export function iniciais(nome: string): string {
+  return nome
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join("");
+}
