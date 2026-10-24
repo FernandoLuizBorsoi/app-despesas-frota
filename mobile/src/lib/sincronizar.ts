@@ -16,7 +16,7 @@ import type { Categoria, DespesaLocal, Perfil, Veiculo } from './tipos';
 export async function carregarPerfil(usuarioId: string): Promise<Perfil> {
   const { data, error } = await supabase
     .from('usuario')
-    .select('id, empresa_id, nome, perfil')
+    .select('id, empresa_id, nome, perfil, ativo, empresa:empresa_id (id)')
     .eq('id', usuarioId)
     .single();
   if (error) {
@@ -24,8 +24,13 @@ export async function carregarPerfil(usuarioId: string): Promise<Perfil> {
     if (salvo?.id === usuarioId) return salvo;
     throw new Error('Seu usuário ainda não foi cadastrado na frota. Fale com o gestor.');
   }
-  await cachePerfil.gravar(data);
-  return data;
+  // Motorista desativado, ou empresa desativada pelo administrador (aí o banco não devolve a empresa).
+  if (!data.ativo || !data.empresa) {
+    throw new Error('Seu acesso está bloqueado. Fale com o gestor da sua empresa.');
+  }
+  const perfil: Perfil = { id: data.id, empresa_id: data.empresa_id, nome: data.nome, perfil: data.perfil };
+  await cachePerfil.gravar(perfil);
+  return perfil;
 }
 
 export async function atualizarCadastros(): Promise<void> {
