@@ -16,7 +16,7 @@ type Pessoa = {
   foto_caminho: string | null;
 };
 
-const ROTULO_PERFIL = { motorista: "Motorista", gestor: "Gestor", admin: "Admin" };
+const ROTULO_PERFIL = { motorista: "Motorista", gestor: "Gestor", admin: "Administrador geral" };
 
 function formatarCpf(cpf: string | null): string {
   if (!cpf || cpf.length !== 11) return cpf ?? "";
@@ -188,7 +188,8 @@ export default function Motoristas() {
             </tr>
           </thead>
           <tbody>
-            {pessoas.map((p) => (
+            {/* O administrador geral só aparece para ele mesmo, não na lista dos gestores. */}
+            {pessoas.filter((p) => p.perfil !== "admin" || p.id === meuId).map((p) => (
               <tr key={p.id} style={p.ativo ? undefined : { color: "var(--suave)" }}>
                 <td>
                   <label className="avatar" title={p.foto_caminho ? "Trocar foto" : "Enviar foto"}>

@@ -4,7 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { carregarEmpresa, linkDaLogo } from "@/lib/dados";
+import { carregarEmpresa, linkDaLogo, listarEmpresas, trocarEmpresa } from "@/lib/dados";
 import { emailDoLogin } from "@/lib/login";
 import { supabase } from "@/lib/supabase";
 
@@ -17,11 +17,22 @@ const MENU = [
   { href: "/configuracoes", rotulo: "Configurações" },
 ];
 
+// Só o administrador geral vê.
+const MENU_ADMIN = [{ href: "/empresas", rotulo: "Empresas" }];
+
 type Estado =
   | { tipo: "carregando" }
   | { tipo: "deslogado" }
   | { tipo: "sem-permissao" }
-  | { tipo: "ok"; nome: string; empresa: string; logo: string | null };
+  | {
+      tipo: "ok";
+      nome: string;
+      empresa: string;
+      empresaId: string | null;
+      logo: string | null;
+      // Preenchida só para o administrador geral.
+      empresas: { id: string; nome: string }[] | null;
+    };
 
 // Envolve todas as páginas (menos /app): exige login e perfil de gestor ou admin.
 export function Painel({ children }: { children: ReactNode }) {
@@ -34,11 +45,14 @@ export function Painel({ children }: { children: ReactNode }) {
       const { data } = await supabase.from("usuario").select("nome, perfil").eq("id", sessao.user.id).single();
       if (!data || data.perfil === "motorista") return setEstado({ tipo: "sem-permissao" });
       const empresa = await carregarEmpresa();
+      const empresas = data.perfil === "admin" ? await listarEmpresas().catch(() => null) : null;
       setEstado({
         tipo: "ok",
         nome: data.nome,
         empresa: empresa?.nome ?? "Despesas da Frota",
+        empresaId: empresa?.id ?? null,
         logo: linkDaLogo(empresa?.logo_caminho ?? null),
+        empresas,
       });
     }
     supabase.auth.getSession().then(({ data }) => verificar(data.session));
@@ -71,10 +85,28 @@ export function Painel({ children }: { children: ReactNode }) {
         <span className="marca">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {estado.logo && <img src={estado.logo} alt="" />}
-          {estado.empresa}
+          {estado.empresas ? (
+            <select
+              className="seletor-empresa"
+              value={estado.empresaId ?? ""}
+              title="Empresa que você está vendo"
+              onChange={async (e) => {
+                await trocarEmpresa(e.target.value);
+                window.location.reload();
+              }}
+            >
+              {estado.empresas.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.nome}
+                </option>
+              ))}
+            </select>
+          ) : (
+            estado.empresa
+          )}
         </span>
         <nav>
-          {MENU.map((m) => (
+          {[...MENU, ...(estado.empresas ? MENU_ADMIN : [])].map((m) => (
             <Link key={m.href} href={m.href} className={caminho.startsWith(m.href) ? "ativo" : ""}>
               {m.rotulo}
             </Link>

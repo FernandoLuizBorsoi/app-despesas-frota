@@ -663,3 +663,14 @@ label.avatar {
   gap: 12px;
   margin-bottom: 12px;
 }
+
+.seletor-empresa {
+  background: var(--primaria-escura);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-weight: 700;
+  max-width: 260px;
+}

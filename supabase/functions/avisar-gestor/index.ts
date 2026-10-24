@@ -94,8 +94,9 @@ Deno.serve(async (req) => {
   const { data: gestores } = await supabase
     .from("usuario")
     .select("id")
-    .eq("empresa_id", d.empresa_id)
     .in("perfil", ["gestor", "admin"])
+    // Gestores da empresa e o administrador geral (que acompanha todas as empresas).
+    .or(`empresa_id.eq.${d.empresa_id},perfil.eq.admin`)
     .eq("ativo", true);
 
   const enviados: string[] = [];
