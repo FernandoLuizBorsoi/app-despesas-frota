@@ -16,6 +16,7 @@ import {
   cacheCategorias,
   cacheExclusoesVistas,
   cacheLogo,
+  cacheMarcaDagua,
   cacheVeiculos,
   apagarDespesas,
   listarDespesas,
@@ -140,6 +141,7 @@ export default function MinhasDespesas() {
   // Excluídas pelo gestor que o motorista ainda não viu.
   const [excluidas, setExcluidas] = useState<Rejeitada[]>([]);
   const [logo, setLogo] = useState<string | null>(null);
+  const [marcaDagua, setMarcaDagua] = useState(false);
   const [foto, setFoto] = useState<string | null>(null);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [nomes, setNomes] = useState<{ categorias: Map<string, string>; placas: Map<string, string> }>({
@@ -160,8 +162,10 @@ export default function MinhasDespesas() {
         cacheExclusoesVistas.ler(),
         cacheLogo.ler(),
         linkDaMinhaFoto(perfil.id).catch(() => null),
-      ]).then(([listaMes, pendentesLocais, categorias, veiculos, devolvidas, apagadas, vistas, urlLogo, urlFoto]) => {
+        cacheMarcaDagua.ler(),
+      ]).then(([listaMes, pendentesLocais, categorias, veiculos, devolvidas, apagadas, vistas, urlLogo, urlFoto, marca]) => {
         setFoto(urlFoto);
+        setMarcaDagua(marca);
         const jaVistas = new Set(vistas);
         setExcluidas(apagadas.filter((d) => !jaVistas.has(d.id)));
         // Excluída pelo gestor some do app: só fica o aviso, até o motorista tocar em "Entendi".
@@ -407,6 +411,9 @@ export default function MinhasDespesas() {
           </Pressable>
         )}
       />
+      {marcaDagua && logo && (
+        <Image source={{ uri: logo }} style={styles.marcaDagua} resizeMode="contain" pointerEvents="none" />
+      )}
       <Pressable style={[estilos.botao, styles.flutuante]} onPress={() => router.push('/nova')}>
         <Text style={estilos.botaoTexto}>+ Nova despesa</Text>
       </Pressable>
@@ -470,6 +477,8 @@ const styles = StyleSheet.create({
   itemExcluido: { opacity: 0.55 },
   valorExcluido: { textDecorationLine: 'line-through' },
   logo: { width: '100%', height: 70 },
+  // Logo grande e bem clarinha por cima da tela, sem atrapalhar os toques.
+  marcaDagua: { position: 'absolute', top: '25%', left: '10%', width: '80%', height: '50%', opacity: 0.06 },
   avisoExclusao: {
     backgroundColor: '#EEF0F3',
     borderColor: cores.suave,

@@ -674,3 +674,25 @@ label.avatar {
   font-weight: 700;
   max-width: 260px;
 }
+
+/* Logo bem clarinha no fundo das telas, ligada em Configurações. Não recebe cliques. */
+.marca-dagua {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(60vw, 560px);
+  max-height: 60vh;
+  object-fit: contain;
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.opcao-marca {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 16px;
+  cursor: pointer;
+}

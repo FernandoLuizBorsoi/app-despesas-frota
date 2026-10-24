@@ -3,6 +3,7 @@
 import {
   cacheCategorias,
   cacheLogo,
+  cacheMarcaDagua,
   cachePerfil,
   cacheVeiculos,
   listarPendentes,
@@ -44,10 +45,12 @@ export async function atualizarCadastros(): Promise<void> {
   ]);
   if (veiculos.data) await cacheVeiculos.gravar(veiculos.data as Veiculo[]);
   if (categorias.data) await cacheCategorias.gravar(categorias.data as Categoria[]);
-  const { data: empresa, error } = await supabase.from('empresa').select('logo_caminho').maybeSingle();
+  const { data: empresa, error } = await supabase.from('empresa').select('logo_caminho, marca_dagua').maybeSingle();
   if (!error) {
-    const caminho = (empresa as { logo_caminho: string | null } | null)?.logo_caminho ?? null;
+    const dados = empresa as { logo_caminho: string | null; marca_dagua: boolean } | null;
+    const caminho = dados?.logo_caminho ?? null;
     await cacheLogo.gravar(caminho ? supabase.storage.from(BUCKET_MARCA).getPublicUrl(caminho).data.publicUrl : null);
+    await cacheMarcaDagua.gravar(Boolean(dados?.marca_dagua));
   }
 }
 
