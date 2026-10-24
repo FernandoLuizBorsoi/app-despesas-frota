@@ -1,0 +1,56 @@
+# Manda as melhorias do app direto para os celulares (sem baixar APK novo).
+# Roda a cada mudança em mobile/ no main. Mudanças nativas (ícone, módulo novo, permissão)
+# ainda exigem APK novo: nesses casos, aumente "version" no app.json e gere a build.
+name: Atualizar app nos celulares
+
+on:
+  push:
+    branches: [main]
+    paths: ["mobile/**"]
+  workflow_dispatch:
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Conferir a chave da Expo
+        id: chave
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "Falta o segredo EXPO_TOKEN no GitHub; nada foi publicado."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.chave.outputs.ok == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.chave.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: expo/expo-github-action@v8
+        if: steps.chave.outputs.ok == 'true'
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci
+        if: steps.chave.outputs.ok == 'true'
+
+      - name: Publicar a atualização
+        if: steps.chave.outputs.ok == 'true'
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://aiktjvxejegwxwkgzgbj.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_fXk4FNhLMMV10l3Q1ZrEvQ_gGbKquzz
+          MENSAGEM: ${{ github.event.head_commit.message || 'Atualização manual' }}
+        run: eas update --channel preview --platform android --message "$(printf '%s' "$MENSAGEM" | head -n 1)" --non-interactive
