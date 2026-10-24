@@ -20,6 +20,9 @@ const MENU = [
 // Só o administrador geral vê.
 const MENU_ADMIN = [{ href: "/empresas", rotulo: "Empresas" }];
 
+// Só aparece quando a empresa liga a manutenção preventiva em Configurações.
+const MENU_MANUTENCAO = { href: "/manutencao", rotulo: "Manutenção" };
+
 type Estado =
   | { tipo: "carregando" }
   | { tipo: "deslogado" }
@@ -32,6 +35,7 @@ type Estado =
       empresaId: string | null;
       logo: string | null;
       marcaDagua: boolean;
+      manutencao: boolean;
       // Preenchida só para o administrador geral.
       empresas: { id: string; nome: string; ativa: boolean }[] | null;
     };
@@ -57,6 +61,7 @@ export function Painel({ children }: { children: ReactNode }) {
         empresaId: empresa?.id ?? null,
         logo: linkDaLogo(empresa?.logo_caminho ?? null),
         marcaDagua: Boolean(empresa?.marca_dagua),
+        manutencao: Boolean(empresa?.manutencao_ativa),
         empresas,
       });
     }
@@ -116,7 +121,12 @@ export function Painel({ children }: { children: ReactNode }) {
           )}
         </span>
         <nav>
-          {[...MENU, ...(estado.empresas ? MENU_ADMIN : [])].map((m) => (
+          {[
+            ...MENU.slice(0, 4),
+            ...(estado.manutencao ? [MENU_MANUTENCAO] : []),
+            ...MENU.slice(4),
+            ...(estado.empresas ? MENU_ADMIN : []),
+          ].map((m) => (
             <Link key={m.href} href={m.href} className={caminho.startsWith(m.href) ? "ativo" : ""}>
               {m.rotulo}
             </Link>

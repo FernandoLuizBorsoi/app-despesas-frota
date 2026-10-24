@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   valorExcluido: { textDecorationLine: 'line-through' },
   logo: { width: '100%', height: 70 },
   // Logo grande e bem clarinha por cima da tela, sem atrapalhar os toques.
-  marcaDagua: { position: 'absolute', top: '25%', left: '10%', width: '80%', height: '50%', opacity: 0.06 },
+  marcaDagua: { position: 'absolute', top: '25%', left: '10%', width: '80%', height: '50%', opacity: 0.1 },
   avisoExclusao: {
     backgroundColor: '#EEF0F3',
     borderColor: cores.suave,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { carregarEmpresa, ligarMarcaDagua, linkDaLogo, renomearEmpresa, trocarLogo, type Empresa } from "@/lib/dados";
+import { carregarEmpresa, ligarManutencao, ligarMarcaDagua, linkDaLogo, renomearEmpresa, trocarLogo, type Empresa } from "@/lib/dados";
 
 const TAMANHO_MAXIMO = 2 * 1024 * 1024;
 
@@ -127,6 +127,34 @@ export default function Configuracoes() {
           </label>
         )}
         {erro && <p className="erro">{erro}</p>}
+      </div>
+      <div className="cartao" style={{ maxWidth: 560 }}>
+        <h2>Manutenção preventiva</h2>
+        <p className="rotulo-suave">
+          Liga a tela Manutenção no menu: você cadastra os serviços de cada veículo (troca de óleo, pneus, revisão) a
+          cada tantos km ou meses, e o painel avisa quando estiver chegando a hora, usando o km que os motoristas
+          lançam.
+        </p>
+        <label className="opcao-marca">
+          <input
+            type="checkbox"
+            checked={empresa.manutencao_ativa}
+            disabled={salvando}
+            onChange={async (e) => {
+              const ligada = e.target.checked;
+              setSalvando(true);
+              setErro(null);
+              try {
+                await ligarManutencao(empresa, ligada);
+                window.location.reload();
+              } catch (erro) {
+                setErro(erro instanceof Error ? erro.message : "Não foi possível salvar.");
+                setSalvando(false);
+              }
+            }}
+          />
+          Usar manutenção preventiva
+        </label>
       </div>
     </>
   );
