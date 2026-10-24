@@ -39,6 +39,11 @@ export default function Motoristas() {
   const [versao, setVersao] = useState(0);
   const recarregar = () => setVersao((v) => v + 1);
   const [fotos, setFotos] = useState<Map<string, string>>(new Map());
+  const [meuId, setMeuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setMeuId(data.user?.id ?? null));
+  }, []);
 
   useEffect(() => {
     supabase
@@ -126,7 +131,7 @@ export default function Motoristas() {
 
   return (
     <>
-      <h1>Motoristas</h1>
+      <h1>Motoristas e gestores</h1>
       <form className="cartao filtros" onSubmit={adicionar}>
         <label>
           Nome
@@ -212,15 +217,21 @@ export default function Motoristas() {
                       Gerar nova senha
                     </button>
                   )}
-                  <button className="botao secundario" onClick={() => alternarAtivo(p)}>
-                    {p.ativo ? "Desativar" : "Reativar"}
-                  </button>
+                  {/* Ninguém desativa o próprio acesso, para não ficar trancado fora do painel. */}
+                  {p.id === meuId ? (
+                    <span className="rotulo-suave">Você</span>
+                  ) : (
+                    <button className="botao secundario" onClick={() => alternarAtivo(p)}>
+                      {p.ativo ? "Desativar" : "Reativar"}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
         <p className="rotulo-suave">
+          Para cadastrar outro gestor, escolha Perfil &quot;Gestor&quot;: ele entra no painel com o e-mail e a senha.
           Quem for desativado não consegue mais lançar despesas, mas o histórico continua nos relatórios. Se um
           motorista esquecer a senha, use Gerar nova senha: ela passa a ser os 6 primeiros números do CPF. Clique
           no círculo da foto para enviar ou trocar a foto (o motorista também pode tirar a própria foto no app).

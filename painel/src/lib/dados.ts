@@ -121,6 +121,11 @@ export function linkDaLogo(caminho: string | null): string | null {
   return caminho ? supabase.storage.from("marca").getPublicUrl(caminho).data.publicUrl : null;
 }
 
+export async function renomearEmpresa(empresa: Empresa, nome: string) {
+  const { error } = await supabase.from("empresa").update({ nome }).eq("id", empresa.id);
+  if (error) throw error;
+}
+
 // Cada envio ganha um nome novo, para o celular e o navegador não mostrarem a logo antiga guardada.
 export async function trocarLogo(empresa: Empresa, arquivo: File | null) {
   let caminho: string | null = null;
