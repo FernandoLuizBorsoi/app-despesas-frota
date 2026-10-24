@@ -30,12 +30,13 @@ export type Despesa = {
   motivo_rejeicao: string | null;
 };
 
-export type Situacao = "pendente" | "aprovada" | "rejeitada";
+export type Situacao = "pendente" | "aprovada" | "rejeitada" | "excluida";
 
 export const NOMES_SITUACAO: Record<Situacao, string> = {
   pendente: "Aguardando aprovação",
   aprovada: "Aprovada",
   rejeitada: "Rejeitada",
+  excluida: "Excluída",
 };
 
 export type Filtros = {
@@ -76,17 +77,18 @@ export async function buscarDespesas(f: Filtros): Promise<Despesa[]> {
   if (f.motoristaId) consulta = consulta.eq("motorista_id", f.motoristaId);
   if (f.veiculoId) consulta = consulta.eq("veiculo_id", f.veiculoId);
   if (f.categoriaId) consulta = consulta.eq("categoria_id", f.categoriaId);
-  if (f.situacao) consulta = consulta.eq("situacao", f.situacao);
+  // Excluídas só aparecem quando o filtro pede por elas, e nunca entram nos totais.
+  consulta = f.situacao ? consulta.eq("situacao", f.situacao) : consulta.neq("situacao", "excluida");
   const { data, error } = await consulta;
   if (error) throw error;
   return (data ?? []) as unknown as Despesa[];
 }
 
-// Aprova ou rejeita; ao rejeitar, o motivo aparece no app do motorista.
-export async function avaliarDespesa(id: string, situacao: "aprovada" | "rejeitada", motivo?: string) {
+// Aprova, rejeita ou exclui; ao rejeitar ou excluir, o motivo aparece no app do motorista.
+export async function avaliarDespesa(id: string, situacao: "aprovada" | "rejeitada" | "excluida", motivo?: string) {
   const { error } = await supabase
     .from("despesa")
-    .update(situacao === "rejeitada" ? { situacao, motivo_rejeicao: motivo } : { situacao })
+    .update(situacao === "aprovada" ? { situacao } : { situacao, motivo_rejeicao: motivo })
     .eq("id", id);
   if (error) throw error;
 }
@@ -106,4 +108,28 @@ export function primeiroDiaDoMes(): string {
 export function hoje(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export type Empresa = { id: string; nome: string; logo_caminho: string | null };
+
+export async function carregarEmpresa(): Promise<Empresa | null> {
+  const { data } = await supabase.from("empresa").select("id, nome, logo_caminho").maybeSingle();
+  return data as Empresa | null;
+}
+
+export function linkDaLogo(caminho: string | null): string | null {
+  return caminho ? supabase.storage.from("marca").getPublicUrl(caminho).data.publicUrl : null;
+}
+
+// Cada envio ganha um nome novo, para o celular e o navegador não mostrarem a logo antiga guardada.
+export async function trocarLogo(empresa: Empresa, arquivo: File | null) {
+  let caminho: string | null = null;
+  if (arquivo) {
+    const extensao = arquivo.type === "image/png" ? "png" : "jpg";
+    caminho = `${empresa.id}/logo-${Date.now()}.${extensao}`;
+    const { error } = await supabase.storage.from("marca").upload(caminho, arquivo, { contentType: arquivo.type });
+    if (error) throw error;
+  }
+  const { error } = await supabase.from("empresa").update({ logo_caminho: caminho }).eq("id", empresa.id);
+  if (error) throw error;
 }

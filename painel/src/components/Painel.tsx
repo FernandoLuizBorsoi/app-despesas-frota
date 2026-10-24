@@ -4,6 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { carregarEmpresa, linkDaLogo } from "@/lib/dados";
 import { emailDoLogin } from "@/lib/login";
 import { supabase } from "@/lib/supabase";
 
@@ -12,13 +13,14 @@ const MENU = [
   { href: "/relatorios", rotulo: "Relatórios" },
   { href: "/veiculos", rotulo: "Veículos" },
   { href: "/motoristas", rotulo: "Motoristas" },
+  { href: "/configuracoes", rotulo: "Configurações" },
 ];
 
 type Estado =
   | { tipo: "carregando" }
   | { tipo: "deslogado" }
   | { tipo: "sem-permissao" }
-  | { tipo: "ok"; nome: string };
+  | { tipo: "ok"; nome: string; logo: string | null };
 
 // Envolve todas as páginas (menos /app): exige login e perfil de gestor ou admin.
 export function Painel({ children }: { children: ReactNode }) {
@@ -30,7 +32,8 @@ export function Painel({ children }: { children: ReactNode }) {
       if (!sessao) return setEstado({ tipo: "deslogado" });
       const { data } = await supabase.from("usuario").select("nome, perfil").eq("id", sessao.user.id).single();
       if (!data || data.perfil === "motorista") return setEstado({ tipo: "sem-permissao" });
-      setEstado({ tipo: "ok", nome: data.nome });
+      const empresa = await carregarEmpresa();
+      setEstado({ tipo: "ok", nome: data.nome, logo: linkDaLogo(empresa?.logo_caminho ?? null) });
     }
     supabase.auth.getSession().then(({ data }) => verificar(data.session));
     const { data } = supabase.auth.onAuthStateChange((_e, sessao) => {
@@ -59,7 +62,11 @@ export function Painel({ children }: { children: ReactNode }) {
   return (
     <>
       <header className="topo">
-        <span className="marca">Despesas da Frota</span>
+        <span className="marca">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {estado.logo && <img src={estado.logo} alt="" />}
+          Despesas da Frota
+        </span>
         <nav>
           {MENU.map((m) => (
             <Link key={m.href} href={m.href} className={caminho.startsWith(m.href) ? "ativo" : ""}>

@@ -92,7 +92,7 @@ export default function Despesas() {
                   <td>{d.categoria?.nome}</td>
                   <td className="numero">{d.km_odometro === null ? "" : numero(d.km_odometro)}</td>
                   <td className="numero">{reais(Number(d.valor))}</td>
-                  <td>{d.comprovante.length > 0 ? `Ver (${d.comprovante.length})` : "Sem foto"}</td>
+                  <td>{d.comprovante.length > 0 ? `Ver (${d.comprovante.length})` : "Sem anexo"}</td>
                   <td>
                     <span className={`selo ${d.situacao}`}>{NOMES_SITUACAO[d.situacao]}</span>
                   </td>
@@ -126,15 +126,16 @@ function DetalheDespesa({
   aoFechar: () => void;
   aoAvaliar: () => void;
 }) {
-  const [fotos, setFotos] = useState<string[] | null>(null);
-  const [rejeitando, setRejeitando] = useState(false);
+  const [fotos, setFotos] = useState<{ url: string; pdf: boolean }[] | null>(null);
+  // Qual pedido o gestor está escrevendo: devolver para o motorista corrigir ou excluir.
+  const [pedido, setPedido] = useState<"rejeitada" | "excluida" | null>(null);
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  async function avaliar(situacao: "aprovada" | "rejeitada") {
-    if (situacao === "rejeitada" && !motivo.trim()) {
-      setErro("Escreva o que o motorista precisa corrigir.");
+  async function avaliar(situacao: "aprovada" | "rejeitada" | "excluida") {
+    if (situacao !== "aprovada" && !motivo.trim()) {
+      setErro(situacao === "rejeitada" ? "Escreva o que o motorista precisa corrigir." : "Escreva o motivo da exclusão.");
       return;
     }
     setSalvando(true);
@@ -151,7 +152,7 @@ function DetalheDespesa({
   useEffect(() => {
     const caminhos = [...d.comprovante].sort((a, b) => a.ordem - b.ordem).map((c) => c.caminho);
     linksDasFotos(caminhos)
-      .then(setFotos)
+      .then((urls) => setFotos(urls.map((url, i) => ({ url, pdf: caminhos[i].toLowerCase().endsWith(".pdf") }))))
       .catch(() => setFotos([]));
   }, [d]);
 
@@ -189,59 +190,80 @@ function DetalheDespesa({
             </tr>
             {d.motivo_rejeicao && (
               <tr>
-                <th>{d.situacao === "rejeitada" ? "Pedido ao motorista" : "Último pedido de ajuste"}</th>
+                <th>
+                  {d.situacao === "excluida"
+                    ? "Motivo da exclusão"
+                    : d.situacao === "rejeitada"
+                      ? "Pedido ao motorista"
+                      : "Último pedido de ajuste"}
+                </th>
                 <td>{d.motivo_rejeicao}</td>
               </tr>
             )}
           </tbody>
         </table>
-        {d.situacao !== "aprovada" && (
+        {d.situacao !== "excluida" && (
           <div className="avaliacao">
-            {rejeitando ? (
+            {pedido ? (
               <>
                 <label>
-                  O que o motorista precisa corrigir?
+                  {pedido === "rejeitada" ? "O que o motorista precisa corrigir?" : "Por que esta despesa vai ser excluída?"}
                   <textarea
                     value={motivo}
                     onChange={(e) => setMotivo(e.target.value)}
                     rows={3}
                     autoFocus
-                    placeholder="Ex.: a foto do cupom está ilegível, tire outra."
+                    placeholder={
+                      pedido === "rejeitada"
+                        ? "Ex.: a foto do cupom está ilegível, tire outra."
+                        : "Ex.: despesa lançada duas vezes."
+                    }
                   />
                 </label>
                 <div className="botoes">
-                  <button className="botao perigo" onClick={() => avaliar("rejeitada")} disabled={salvando}>
-                    Enviar para o motorista corrigir
+                  <button className="botao perigo" onClick={() => avaliar(pedido)} disabled={salvando}>
+                    {pedido === "rejeitada" ? "Enviar para o motorista corrigir" : "Excluir e avisar o motorista"}
                   </button>
-                  <button className="botao secundario" onClick={() => setRejeitando(false)} disabled={salvando}>
+                  <button className="botao secundario" onClick={() => setPedido(null)} disabled={salvando}>
                     Cancelar
                   </button>
                 </div>
               </>
             ) : (
               <div className="botoes">
-                <button className="botao" onClick={() => avaliar("aprovada")} disabled={salvando}>
-                  Aprovar
-                </button>
-                {d.situacao !== "rejeitada" && (
-                  <button className="botao perigo" onClick={() => setRejeitando(true)} disabled={salvando}>
+                {d.situacao !== "aprovada" && (
+                  <button className="botao" onClick={() => avaliar("aprovada")} disabled={salvando}>
+                    Aprovar
+                  </button>
+                )}
+                {d.situacao === "pendente" && (
+                  <button className="botao perigo" onClick={() => setPedido("rejeitada")} disabled={salvando}>
                     Rejeitar
                   </button>
                 )}
+                <button className="botao secundario" onClick={() => setPedido("excluida")} disabled={salvando}>
+                  Excluir
+                </button>
               </div>
             )}
             {erro && <p className="erro">{erro}</p>}
           </div>
         )}
         <div className="fotos">
-          {fotos === null && <p>Carregando fotos...</p>}
-          {fotos?.length === 0 && <p className="rotulo-suave">Sem fotos.</p>}
-          {fotos?.map((url) => (
-            <a key={url} href={url} target="_blank" rel="noreferrer">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="Comprovante" />
-            </a>
-          ))}
+          {fotos === null && <p>Carregando anexos...</p>}
+          {fotos?.length === 0 && <p className="rotulo-suave">Sem anexos.</p>}
+          {fotos?.map(({ url, pdf }) =>
+            pdf ? (
+              <a key={url} href={url} target="_blank" rel="noreferrer" className="botao secundario">
+                Abrir arquivo PDF
+              </a>
+            ) : (
+              <a key={url} href={url} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="Comprovante" />
+              </a>
+            ),
+          )}
         </div>
       </div>
     </div>

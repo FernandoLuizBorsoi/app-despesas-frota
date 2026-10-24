@@ -1,6 +1,7 @@
 // Fotos dos comprovantes: tira ou escolhe, reduz o tamanho e guarda até o envio.
 import { Directory, File, Paths } from 'expo-file-system';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
 // Largura suficiente para ler um cupom fiscal; cada foto fica com cerca de 200 a 400 KB.
@@ -49,6 +50,20 @@ export async function escolherDaGaleria(): Promise<FotoNova[]> {
   return Promise.all(
     resultado.assets.map(async (a) => ({ uri: await compactarEGuardar(a.uri, a.width), original: a.uri })),
   );
+}
+
+// Nota fiscal em PDF (por exemplo, recebida por e-mail). Vai como está, sem leitura do valor.
+export async function escolherPdf(): Promise<string | null> {
+  const resultado = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+  if (resultado.canceled) return null;
+  if (!pasta.exists) pasta.create({ intermediates: true });
+  const destino = new File(pasta, `${Date.now()}.pdf`);
+  await new File(resultado.assets[0].uri).copy(destino);
+  return destino.uri;
+}
+
+export function ehPdf(caminho: string): boolean {
+  return caminho.toLowerCase().endsWith('.pdf');
 }
 
 export async function lerBytes(uri: string): Promise<ArrayBuffer> {

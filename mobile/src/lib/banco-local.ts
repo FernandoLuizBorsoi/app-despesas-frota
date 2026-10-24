@@ -92,6 +92,19 @@ export const cachePerfil = {
   gravar: (p: Perfil) => gravarCache('perfil', p),
 };
 
+// Endereço da logo da empresa, para mostrar mesmo sem internet (inclusive na tela de login).
+export const cacheLogo = {
+  ler: () => lerCache<string>('logo'),
+  gravar: (url: string | null) => gravarCache('logo', url),
+};
+
+// Despesas excluídas pelo gestor cujo aviso o motorista já viu.
+export const cacheExclusoesVistas = {
+  ler: async () => (await lerCache<string[]>('exclusoes-vistas')) ?? [],
+  gravar: (ids: string[]) => gravarCache('exclusoes-vistas', ids),
+};
+
+// A logo é da empresa, não do motorista: fica para a próxima vez que alguém entrar.
 export async function limparTudo(): Promise<void> {
-  await db.execAsync('DELETE FROM despesa; DELETE FROM cache;');
+  await db.execAsync("DELETE FROM despesa; DELETE FROM cache WHERE chave <> 'logo';");
 }

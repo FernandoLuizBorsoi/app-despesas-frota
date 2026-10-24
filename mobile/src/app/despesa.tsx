@@ -1,11 +1,11 @@
 // Detalhes de uma despesa já lançada, com as fotos do comprovante.
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { cacheCategorias, cacheVeiculos, listarDespesas } from '../lib/banco-local';
 import { cores, estilos } from '../lib/estilos';
 import { dataTextoDeIso, formatarReais } from '../lib/formato';
-import { PREFIXO_REMOTO } from '../lib/fotos';
+import { ehPdf, PREFIXO_REMOTO } from '../lib/fotos';
 import { BUCKET_COMPROVANTES, supabase } from '../lib/supabase';
 import type { Situacao } from '../lib/tipos';
 
@@ -20,8 +20,11 @@ type Detalhe = {
   observacao: string | null;
   situacao: Situacao | null; // null enquanto não foi enviada
   motivo_rejeicao: string | null;
-  fotos: string[]; // endereços prontos para mostrar
+  fotos: Anexo[];
 };
+
+// Endereço pronto para mostrar (foto) ou abrir (PDF).
+type Anexo = { uri: string; pdf: boolean };
 
 type LinhaServidor = {
   categoria_id: string;
@@ -41,12 +44,15 @@ const TEXTO_SITUACAO: Record<Situacao, string> = {
   pendente: 'Aguardando aprovação',
   aprovada: 'Aprovada ✓',
   rejeitada: 'Precisa de ajuste',
+  excluida: 'Excluída pelo gestor',
 };
 
-async function linksAssinados(caminhos: string[]): Promise<string[]> {
+async function linksAssinados(caminhos: string[]): Promise<Anexo[]> {
   if (caminhos.length === 0) return [];
   const { data } = await supabase.storage.from(BUCKET_COMPROVANTES).createSignedUrls(caminhos, 60 * 60);
-  return (data ?? []).map((l) => l.signedUrl ?? '').filter(Boolean);
+  return (data ?? [])
+    .map((l, i) => ({ uri: l.signedUrl ?? '', pdf: ehPdf(caminhos[i]) }))
+    .filter((a) => a.uri);
 }
 
 // Despesa ainda só no celular: mostra o que está guardado nele. Já enviada: busca no servidor,
@@ -76,13 +82,15 @@ async function carregar(id: string): Promise<Detalhe | null> {
   const remotas = local.fotos
     .filter((f) => f.startsWith(PREFIXO_REMOTO))
     .map((f) => f.slice(PREFIXO_REMOTO.length));
-  const links = await linksAssinados(remotas).catch(() => []);
+  const links = await linksAssinados(remotas).catch((): Anexo[] => []);
   let r = 0;
   return {
     ...local,
     situacao: null,
     motivo_rejeicao: null,
-    fotos: local.fotos.map((f) => (f.startsWith(PREFIXO_REMOTO) ? (links[r++] ?? '') : f)).filter(Boolean),
+    fotos: local.fotos
+      .map((f) => (f.startsWith(PREFIXO_REMOTO) ? links[r++] : { uri: f, pdf: ehPdf(f) }))
+      .filter((a): a is Anexo => Boolean(a)),
   };
 }
 
@@ -141,8 +149,11 @@ export default function DetalheDespesa() {
         <Text style={[styles.situacao, detalhe.situacao && styles[detalhe.situacao]]}>
           {detalhe.situacao ? TEXTO_SITUACAO[detalhe.situacao] : 'Aguardando envio'}
         </Text>
-        {detalhe.situacao === 'rejeitada' && detalhe.motivo_rejeicao && (
+        {(detalhe.situacao === 'rejeitada' || detalhe.situacao === 'excluida') && detalhe.motivo_rejeicao && (
           <Text style={styles.motivo}>Gestor: {detalhe.motivo_rejeicao}</Text>
+        )}
+        {detalhe.situacao === 'excluida' && (
+          <Text style={styles.motivo}>Esta despesa não conta mais no total do mês.</Text>
         )}
         <View style={styles.divisor} />
         {linhas.map(([rotulo, valor]) => (
@@ -163,13 +174,22 @@ export default function DetalheDespesa() {
       )}
 
       <Text style={estilos.rotulo}>Comprovante</Text>
-      {detalhe.fotos.length === 0 && <Text style={styles.rotulo}>Sem fotos.</Text>}
-      {detalhe.fotos.map((uri) => (
-        <Pressable key={uri} onPress={() => setAmpliada(uri)}>
-          <Image source={{ uri }} style={styles.foto} resizeMode="contain" />
-        </Pressable>
-      ))}
-      {detalhe.fotos.length > 0 && <Text style={styles.dica}>Toque na foto para ampliar.</Text>}
+      {detalhe.fotos.length === 0 && <Text style={styles.rotulo}>Sem anexos.</Text>}
+      {detalhe.fotos.map(({ uri, pdf }) =>
+        pdf && uri.startsWith('file:') ? (
+          // O Android não abre arquivo do próprio app por link; depois de enviado, abre normalmente.
+          <Text key={uri} style={styles.rotulo}>Arquivo PDF (abre depois de enviado)</Text>
+        ) : pdf ? (
+          <Pressable key={uri} style={estilos.botaoSecundario} onPress={() => Linking.openURL(uri)}>
+            <Text style={estilos.botaoSecundarioTexto}>Abrir arquivo PDF</Text>
+          </Pressable>
+        ) : (
+          <Pressable key={uri} onPress={() => setAmpliada(uri)}>
+            <Image source={{ uri }} style={styles.foto} resizeMode="contain" />
+          </Pressable>
+        ),
+      )}
+      {detalhe.fotos.some((a) => !a.pdf) && <Text style={styles.dica}>Toque na foto para ampliar.</Text>}
 
       <Modal visible={ampliada !== null} transparent={false} onRequestClose={() => setAmpliada(null)}>
         <Pressable style={styles.fundoAmpliada} onPress={() => setAmpliada(null)}>
@@ -188,6 +208,7 @@ const styles = StyleSheet.create({
   pendente: { color: cores.suave },
   aprovada: { color: cores.sucesso },
   rejeitada: { color: cores.erro },
+  excluida: { color: cores.suave, textDecorationLine: 'line-through' },
   motivo: { fontSize: 15, color: cores.texto },
   divisor: { height: 1, backgroundColor: cores.borda, marginVertical: 6 },
   linha: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
