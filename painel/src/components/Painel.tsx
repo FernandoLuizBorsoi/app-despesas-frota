@@ -21,7 +21,7 @@ type Estado =
   | { tipo: "carregando" }
   | { tipo: "deslogado" }
   | { tipo: "sem-permissao" }
-  | { tipo: "ok"; nome: string; logo: string | null };
+  | { tipo: "ok"; nome: string; empresa: string; logo: string | null };
 
 // Envolve todas as páginas (menos /app): exige login e perfil de gestor ou admin.
 export function Painel({ children }: { children: ReactNode }) {
@@ -34,7 +34,12 @@ export function Painel({ children }: { children: ReactNode }) {
       const { data } = await supabase.from("usuario").select("nome, perfil").eq("id", sessao.user.id).single();
       if (!data || data.perfil === "motorista") return setEstado({ tipo: "sem-permissao" });
       const empresa = await carregarEmpresa();
-      setEstado({ tipo: "ok", nome: data.nome, logo: linkDaLogo(empresa?.logo_caminho ?? null) });
+      setEstado({
+        tipo: "ok",
+        nome: data.nome,
+        empresa: empresa?.nome ?? "Despesas da Frota",
+        logo: linkDaLogo(empresa?.logo_caminho ?? null),
+      });
     }
     supabase.auth.getSession().then(({ data }) => verificar(data.session));
     const { data } = supabase.auth.onAuthStateChange((_e, sessao) => {
@@ -66,7 +71,7 @@ export function Painel({ children }: { children: ReactNode }) {
         <span className="marca">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {estado.logo && <img src={estado.logo} alt="" />}
-          Despesas da Frota
+          {estado.empresa}
         </span>
         <nav>
           {MENU.map((m) => (

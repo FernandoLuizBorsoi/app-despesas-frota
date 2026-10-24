@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { carregarEmpresa, linkDaLogo, trocarLogo, type Empresa } from "@/lib/dados";
+import { carregarEmpresa, linkDaLogo, renomearEmpresa, trocarLogo, type Empresa } from "@/lib/dados";
 
 const TAMANHO_MAXIMO = 2 * 1024 * 1024;
 
@@ -9,10 +9,30 @@ export default function Configuracoes() {
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [nome, setNome] = useState("");
+  const [erroNome, setErroNome] = useState<string | null>(null);
 
   useEffect(() => {
-    carregarEmpresa().then(setEmpresa);
+    carregarEmpresa().then((e) => {
+      setEmpresa(e);
+      setNome(e?.nome ?? "");
+    });
   }, []);
+
+  async function salvarNome(e: React.FormEvent) {
+    e.preventDefault();
+    if (!empresa || !nome.trim()) return;
+    setSalvando(true);
+    setErroNome(null);
+    try {
+      await renomearEmpresa(empresa, nome.trim());
+      // Recarrega para o nome novo aparecer também no topo do painel.
+      window.location.reload();
+    } catch (e) {
+      setErroNome(e instanceof Error ? e.message : "Não foi possível salvar.");
+      setSalvando(false);
+    }
+  }
 
   async function salvar(arquivo: File | null) {
     if (!empresa) return;
@@ -42,6 +62,17 @@ export default function Configuracoes() {
   return (
     <>
       <h1>Configurações</h1>
+      <form className="cartao" style={{ maxWidth: 560 }} onSubmit={salvarNome}>
+        <h2>Nome da empresa</h2>
+        <p className="rotulo-suave">Aparece no topo do painel.</p>
+        <div className="botoes">
+          <input value={nome} onChange={(e) => setNome(e.target.value)} required style={{ flex: 1 }} />
+          <button className="botao" disabled={salvando || !nome.trim() || nome.trim() === empresa.nome}>
+            Salvar nome
+          </button>
+        </div>
+        {erroNome && <p className="erro">{erroNome}</p>}
+      </form>
       <div className="cartao" style={{ maxWidth: 560 }}>
         <h2>Logo da empresa</h2>
         <p className="rotulo-suave">
