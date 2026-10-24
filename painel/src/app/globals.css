@@ -120,7 +120,8 @@ select {
   min-width: 140px;
 }
 
-button.botao {
+button.botao,
+a.botao {
   font: inherit;
   font-weight: 600;
   padding: 9px 16px;
@@ -131,7 +132,8 @@ button.botao {
   cursor: pointer;
 }
 
-button.botao.secundario {
+button.botao.secundario,
+a.botao.secundario {
   background: #fff;
   color: var(--primaria);
 }
@@ -363,4 +365,51 @@ td.acoes {
 button.botao.perigo {
   background: var(--erro);
   border-color: var(--erro);
+}
+
+.selo.excluida {
+  background: #eceff3;
+  color: var(--suave);
+  text-decoration: line-through;
+}
+
+a.botao {
+  display: inline-block;
+  text-decoration: none;
+}
+
+label.botao {
+  display: inline-block;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 9px 16px;
+  border-radius: 6px;
+  background: var(--primaria);
+}
+
+.logo-previa {
+  margin: 12px 0 16px;
+  padding: 16px;
+  border: 1px dashed var(--borda);
+  border-radius: 8px;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-previa img {
+  max-height: 120px;
+  max-width: 100%;
+}
+
+.topo .marca img {
+  height: 32px;
+  max-width: 140px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 4px;
+  padding: 2px 4px;
+  vertical-align: middle;
+  margin-right: 8px;
 }

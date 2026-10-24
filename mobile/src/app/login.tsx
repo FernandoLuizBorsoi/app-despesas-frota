@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { cacheLogo } from '../lib/banco-local';
 import { cores, estilos } from '../lib/estilos';
 import { emailDoLogin } from '../lib/login';
 import { useSessao } from '../lib/sessao';
@@ -26,6 +28,12 @@ export default function Login() {
   const [entrando, setEntrando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [lembrar, setLembrar] = useState(true);
+  // Logo da empresa guardada no último acesso (no primeiro acesso ainda não há).
+  const [logo, setLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    cacheLogo.ler().then(setLogo).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     SecureStore.getItemAsync(CHAVE_LOGIN)
@@ -63,6 +71,7 @@ export default function Login() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.caixa}>
+        {logo && <Image source={{ uri: logo }} style={styles.logo} resizeMode="contain" />}
         <Text style={styles.titulo}>Despesas da Frota</Text>
         <Text style={styles.subtitulo}>Entre com o seu CPF e a senha que o gestor passou.</Text>
         <View>
@@ -106,6 +115,7 @@ export default function Login() {
 const styles = StyleSheet.create({
   centro: { justifyContent: 'center', padding: 24 },
   caixa: { gap: 16 },
+  logo: { width: '100%', height: 90 },
   titulo: { fontSize: 26, fontWeight: '700', color: cores.primaria },
   subtitulo: { fontSize: 15, color: cores.suave },
   lembrar: { flexDirection: 'row', alignItems: 'center', gap: 10 },

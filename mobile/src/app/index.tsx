@@ -1,7 +1,14 @@
 import { Redirect, Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { cacheCategorias, cacheVeiculos, listarDespesas, listarPendentes } from '../lib/banco-local';
+import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import {
+  cacheCategorias,
+  cacheExclusoesVistas,
+  cacheLogo,
+  cacheVeiculos,
+  listarDespesas,
+  listarPendentes,
+} from '../lib/banco-local';
 import { cores, estilos } from '../lib/estilos';
 import { dataTextoDeIso, formatarReais, mesAtual, nomeDoMes, somarMeses } from '../lib/formato';
 import { useSessao } from '../lib/sessao';
@@ -78,13 +85,13 @@ async function carregarMes(motoristaId: string, mes: string): Promise<ItemLista[
   return [...porId.values()].sort((a, b) => b.data.localeCompare(a.data));
 }
 
-// Despesas que o gestor devolveu para corrigir, de qualquer mês.
-async function carregarRejeitadas(motoristaId: string): Promise<Rejeitada[]> {
+// Despesas que o gestor devolveu para corrigir (ou excluiu), de qualquer mês.
+async function carregarAvaliadas(motoristaId: string, situacao: 'rejeitada' | 'excluida'): Promise<Rejeitada[]> {
   const { data } = await supabase
     .from('despesa')
     .select('id, data, valor, categoria_id, motivo_rejeicao')
     .eq('motorista_id', motoristaId)
-    .eq('situacao', 'rejeitada')
+    .eq('situacao', situacao)
     .order('data');
   return (data ?? []) as Rejeitada[];
 }
@@ -93,6 +100,7 @@ const TEXTO_SITUACAO: Record<Situacao, string> = {
   pendente: 'Aguardando aprovação',
   aprovada: 'Aprovada ✓',
   rejeitada: 'Precisa de ajuste',
+  excluida: 'Excluída pelo gestor',
 };
 
 export default function MinhasDespesas() {
@@ -103,6 +111,9 @@ export default function MinhasDespesas() {
   const [despesas, setDespesas] = useState<ItemLista[]>([]);
   const [pendentes, setPendentes] = useState(0);
   const [rejeitadas, setRejeitadas] = useState<Rejeitada[]>([]);
+  // Excluídas pelo gestor que o motorista ainda não viu.
+  const [excluidas, setExcluidas] = useState<Rejeitada[]>([]);
+  const [logo, setLogo] = useState<string | null>(null);
   const [nomes, setNomes] = useState<{ categorias: Map<string, string>; placas: Map<string, string> }>({
     categorias: new Map(),
     placas: new Map(),
@@ -116,8 +127,14 @@ export default function MinhasDespesas() {
         listarPendentes(),
         cacheCategorias.ler(),
         cacheVeiculos.ler(),
-        carregarRejeitadas(perfil.id).catch(() => []),
-      ]).then(([lista, naoEnviadas, categorias, veiculos, devolvidas]) => {
+        carregarAvaliadas(perfil.id, 'rejeitada').catch(() => []),
+        carregarAvaliadas(perfil.id, 'excluida').catch(() => []),
+        cacheExclusoesVistas.ler(),
+        cacheLogo.ler(),
+      ]).then(([lista, naoEnviadas, categorias, veiculos, devolvidas, apagadas, vistas, urlLogo]) => {
+        const jaVistas = new Set(vistas);
+        setExcluidas(apagadas.filter((d) => !jaVistas.has(d.id)));
+        setLogo(urlLogo);
         setDespesas(lista);
         setPendentes(naoEnviadas.length);
         // As que já foram corrigidas e esperam internet não precisam mais de aviso.
@@ -136,11 +153,13 @@ export default function MinhasDespesas() {
     const porCategoria = new Map<string, number>();
     let total = 0;
     for (const d of despesas) {
+      if (d.situacao === 'excluida') continue;
       total += d.valor_centavos;
       porCategoria.set(d.categoria_id, (porCategoria.get(d.categoria_id) ?? 0) + d.valor_centavos);
     }
     const grupos = [...porCategoria.entries()].sort((a, b) => b[1] - a[1]);
-    return { total, grupos };
+    const quantidade = despesas.filter((d) => d.situacao !== 'excluida').length;
+    return { total, grupos, quantidade };
   }, [despesas]);
 
   if (carregando) {
@@ -164,9 +183,15 @@ export default function MinhasDespesas() {
 
   const ehMesAtual = mes === mesAtual();
   const corrigir = (id: string) => router.push({ pathname: '/nova', params: { id } });
+  async function entendiExclusoes() {
+    const vistas = await cacheExclusoesVistas.ler();
+    await cacheExclusoesVistas.gravar([...new Set([...vistas, ...excluidas.map((d) => d.id)])]);
+    setExcluidas([]);
+  }
 
   const cabecalho = (
     <View style={{ gap: 12 }}>
+      {logo && <Image source={{ uri: logo }} style={styles.logo} resizeMode="contain" />}
       <View>
         <Text style={styles.ola}>Olá, {perfil.nome.split(' ')[0]}</Text>
         <Text style={[styles.status, pendentes > 0 && { color: cores.aviso }]}>
@@ -197,6 +222,26 @@ export default function MinhasDespesas() {
         </View>
       )}
 
+      {excluidas.length > 0 && (
+        <View style={styles.avisoExclusao}>
+          <Text style={styles.avisoExclusaoTitulo}>
+            {excluidas.length === 1 ? 'O gestor excluiu 1 despesa' : `O gestor excluiu ${excluidas.length} despesas`}
+          </Text>
+          {excluidas.map((d) => (
+            <View key={d.id} style={styles.alertaItem}>
+              <Text style={styles.alertaLinha}>
+                {dataTextoDeIso(d.data)} · {nomes.categorias.get(d.categoria_id) ?? 'Despesa'} ·{' '}
+                {formatarReais(Math.round(d.valor * 100))}
+              </Text>
+              {d.motivo_rejeicao && <Text style={styles.alertaMotivo}>Motivo: {d.motivo_rejeicao}</Text>}
+            </View>
+          ))}
+          <Pressable style={estilos.botaoSecundario} onPress={entendiExclusoes}>
+            <Text style={estilos.botaoSecundarioTexto}>Entendi</Text>
+          </Pressable>
+        </View>
+      )}
+
       <View style={styles.seletorMes}>
         <Pressable onPress={() => setMes((m) => somarMeses(m, -1))} hitSlop={12} style={styles.seta}>
           <Text style={styles.setaTexto}>‹</Text>
@@ -215,7 +260,7 @@ export default function MinhasDespesas() {
       <View style={styles.resumo}>
         <Text style={styles.resumoRotulo}>Total do mês</Text>
         <Text style={styles.resumoTotal}>{formatarReais(resumo.total)}</Text>
-        <Text style={styles.resumoRotulo}>{despesas.length} despesa(s)</Text>
+        <Text style={styles.resumoRotulo}>{resumo.quantidade} despesa(s)</Text>
         {resumo.grupos.length > 0 && <View style={styles.divisor} />}
         {resumo.grupos.map(([categoriaId, valor]) => (
           <View key={categoriaId} style={styles.grupo}>
@@ -247,7 +292,11 @@ export default function MinhasDespesas() {
         ListEmptyComponent={<Text style={styles.vazio}>Nenhuma despesa neste mês.</Text>}
         renderItem={({ item }) => (
           <Pressable
-            style={[styles.item, item.situacao === 'rejeitada' && styles.itemRejeitado]}
+            style={[
+              styles.item,
+              item.situacao === 'rejeitada' && styles.itemRejeitado,
+              item.situacao === 'excluida' && styles.itemExcluido,
+            ]}
             onPress={() => router.push({ pathname: '/despesa', params: { id: item.id } })}
           >
             <View style={{ flex: 1 }}>
@@ -255,7 +304,7 @@ export default function MinhasDespesas() {
               <Text style={styles.itemDetalhe}>
                 {dataTextoDeIso(item.data)} · {nomes.placas.get(item.veiculo_id) ?? ''}
                 {item.km_odometro != null ? ` · ${item.km_odometro.toLocaleString('pt-BR')} km` : ''}
-                {` · ${item.fotos} foto(s)`}
+                {` · ${item.fotos} anexo(s)`}
               </Text>
               {!item.enviada && (
                 <Text style={styles.itemPendente}>
@@ -267,11 +316,15 @@ export default function MinhasDespesas() {
               {item.situacao && (
                 <Text style={[styles.itemSituacao, styles[item.situacao]]}>
                   {TEXTO_SITUACAO[item.situacao]}
-                  {item.situacao === 'rejeitada' && item.motivo_rejeicao ? `: ${item.motivo_rejeicao}` : ''}
+                  {(item.situacao === 'rejeitada' || item.situacao === 'excluida') && item.motivo_rejeicao
+                    ? `: ${item.motivo_rejeicao}`
+                    : ''}
                 </Text>
               )}
             </View>
-            <Text style={styles.itemValor}>{formatarReais(item.valor_centavos)}</Text>
+            <Text style={[styles.itemValor, item.situacao === 'excluida' && styles.valorExcluido]}>
+              {formatarReais(item.valor_centavos)}
+            </Text>
           </Pressable>
         )}
       />
@@ -323,6 +376,19 @@ const styles = StyleSheet.create({
   pendente: { color: cores.suave },
   aprovada: { color: cores.sucesso },
   rejeitada: { color: cores.erro, fontWeight: '600' },
+  excluida: { color: cores.suave },
+  itemExcluido: { opacity: 0.55 },
+  valorExcluido: { textDecorationLine: 'line-through' },
+  logo: { width: '100%', height: 70 },
+  avisoExclusao: {
+    backgroundColor: '#EEF0F3',
+    borderColor: cores.suave,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    gap: 8,
+  },
+  avisoExclusaoTitulo: { fontSize: 16, fontWeight: '700', color: cores.texto },
   alerta: {
     backgroundColor: '#FDECEA',
     borderColor: cores.erro,

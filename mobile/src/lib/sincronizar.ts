@@ -2,14 +2,15 @@
 // Cada passo pode ser repetido sem duplicar nada, então uma falha no meio só é tentada de novo.
 import {
   cacheCategorias,
+  cacheLogo,
   cachePerfil,
   cacheVeiculos,
   listarPendentes,
   marcarEnviada,
   marcarErro,
 } from './banco-local';
-import { lerBytes, PREFIXO_REMOTO } from './fotos';
-import { BUCKET_COMPROVANTES, supabase } from './supabase';
+import { ehPdf, lerBytes, PREFIXO_REMOTO } from './fotos';
+import { BUCKET_COMPROVANTES, BUCKET_MARCA, supabase } from './supabase';
 import type { Categoria, DespesaLocal, Perfil, Veiculo } from './tipos';
 
 export async function carregarPerfil(usuarioId: string): Promise<Perfil> {
@@ -38,6 +39,11 @@ export async function atualizarCadastros(): Promise<void> {
   ]);
   if (veiculos.data) await cacheVeiculos.gravar(veiculos.data as Veiculo[]);
   if (categorias.data) await cacheCategorias.gravar(categorias.data as Categoria[]);
+  const { data: empresa, error } = await supabase.from('empresa').select('logo_caminho').maybeSingle();
+  if (!error) {
+    const caminho = (empresa as { logo_caminho: string | null } | null)?.logo_caminho ?? null;
+    await cacheLogo.gravar(caminho ? supabase.storage.from(BUCKET_MARCA).getPublicUrl(caminho).data.publicUrl : null);
+  }
 }
 
 async function enviarDespesa(d: DespesaLocal, perfil: Perfil): Promise<void> {
@@ -51,7 +57,7 @@ async function enviarDespesa(d: DespesaLocal, perfil: Perfil): Promise<void> {
     const caminho = `${perfil.empresa_id}/${perfil.id}/${d.id}/${uri.split('/').pop()}`;
     const { error } = await supabase.storage
       .from(BUCKET_COMPROVANTES)
-      .upload(caminho, await lerBytes(uri), { contentType: 'image/jpeg', upsert: true });
+      .upload(caminho, await lerBytes(uri), { contentType: ehPdf(uri) ? 'application/pdf' : 'image/jpeg', upsert: true });
     if (error) throw error;
     caminhos.push(caminho);
   }
@@ -104,8 +110,8 @@ export function sincronizar(perfil: Perfil): Promise<number> {
           await marcarEnviada(d.id);
         } catch (e) {
           const mensagem = e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e);
-          // Já estava no servidor e o gestor aprovou: não há mais nada a enviar.
-          if (mensagem.includes('já foi aprovada')) {
+          // Já estava no servidor e o gestor aprovou ou excluiu: não há mais nada a enviar.
+          if (mensagem.includes('já foi aprovada') || mensagem.includes('foi excluída')) {
             await marcarEnviada(d.id);
             continue;
           }

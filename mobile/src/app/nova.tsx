@@ -15,7 +15,15 @@ import {
 import { cacheCategorias, cacheVeiculos, listarDespesas, salvarDespesa } from '../lib/banco-local';
 import { cores, estilos } from '../lib/estilos';
 import { centavosDeTexto, dataIsoDeTexto, dataTextoDeIso, hojeTexto, numeroDeTexto } from '../lib/formato';
-import { apagarFoto, escolherDaGaleria, fotografarComprovante, PREFIXO_REMOTO, type FotoNova } from '../lib/fotos';
+import {
+  apagarFoto,
+  ehPdf,
+  escolherDaGaleria,
+  escolherPdf,
+  fotografarComprovante,
+  PREFIXO_REMOTO,
+  type FotoNova,
+} from '../lib/fotos';
 import { lerValorDaFoto } from '../lib/ler-valor';
 import { useSessao } from '../lib/sessao';
 import { BUCKET_COMPROVANTES, supabase } from '../lib/supabase';
@@ -171,8 +179,13 @@ export default function NovaDespesa() {
   const categoria = categorias.find((c) => c.id === categoriaId);
   const veiculo = veiculos.find((v) => v.id === veiculoId);
 
-  async function adicionarFotos(origem: 'camera' | 'galeria') {
+  async function adicionarFotos(origem: 'camera' | 'galeria' | 'pdf') {
     try {
+      if (origem === 'pdf') {
+        const pdf = await escolherPdf();
+        if (pdf) setFotos((atuais) => [...atuais, pdf].slice(0, MAX_FOTOS));
+        return;
+      }
       const novas =
         origem === 'camera'
           ? [await fotografarComprovante()].filter((f): f is FotoNova => f !== null)
@@ -180,7 +193,7 @@ export default function NovaDespesa() {
       setFotos((atuais) => [...atuais, ...novas.map((f) => f.uri)].slice(0, MAX_FOTOS));
       if (novas.length > 0 && !valor.trim()) lerValor(novas[0]);
     } catch (e) {
-      Alert.alert('Foto', e instanceof Error ? e.message : 'Não foi possível adicionar a foto.');
+      Alert.alert('Comprovante', e instanceof Error ? e.message : 'Não foi possível adicionar o comprovante.');
     }
   }
 
@@ -198,11 +211,11 @@ export default function NovaDespesa() {
     if (!dataIso) return 'Informe a data no formato DD/MM/AAAA.';
     if (dataIso > new Date().toISOString().slice(0, 10)) return 'A data não pode ser no futuro.';
     const kmNumero = numeroDeTexto(km);
-    if (categoria.exige_km && kmNumero === null) return 'Informe o km do odômetro.';
-    if (kmNumero !== null && (!Number.isInteger(kmNumero) || kmNumero < 0)) return 'O km deve ser um número inteiro.';
+    if (kmNumero === null) return 'Informe o km do odômetro.';
+    if (!Number.isInteger(kmNumero) || kmNumero < 0) return 'O km deve ser um número inteiro.';
     const litrosNumero = numeroDeTexto(litros);
     if (categoria.exige_litros && (litrosNumero === null || litrosNumero <= 0)) return 'Informe os litros abastecidos.';
-    if (fotos.length === 0) return 'Tire pelo menos uma foto do comprovante.';
+    if (fotos.length === 0) return 'Anexe o comprovante: tire uma foto ou escolha o arquivo.';
     return { valorCentavos, dataIso, kmNumero, litrosNumero };
   }
 
@@ -256,7 +269,7 @@ export default function NovaDespesa() {
   }
 
   function conferirKm(dados: Exclude<ReturnType<typeof validar>, string>) {
-    if (dados.kmNumero !== null && veiculo && dados.kmNumero < veiculo.km_atual) {
+    if (veiculo && dados.kmNumero < veiculo.km_atual) {
       Alert.alert(
         'Confira o km',
         `O último km registrado para ${veiculo.placa} é ${veiculo.km_atual.toLocaleString('pt-BR')}. Salvar mesmo assim?`,
@@ -305,14 +318,20 @@ export default function NovaDespesa() {
         <View style={styles.fotos}>
           {fotos.map((uri) => (
             <Pressable key={uri} onLongPress={() => removerFoto(uri)}>
-              <Image
-                source={{ uri: uri.startsWith(PREFIXO_REMOTO) ? linksRemotos.get(uri) : uri }}
-                style={styles.miniatura}
-              />
+              {ehPdf(uri) ? (
+                <View style={[styles.miniatura, styles.miniaturaPdf]}>
+                  <Text style={styles.pdfTexto}>PDF</Text>
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: uri.startsWith(PREFIXO_REMOTO) ? linksRemotos.get(uri) : uri }}
+                  style={styles.miniatura}
+                />
+              )}
             </Pressable>
           ))}
         </View>
-        {fotos.length > 0 && <Text style={styles.dica}>Segure a foto para remover.</Text>}
+        {fotos.length > 0 && <Text style={styles.dica}>Segure o comprovante para remover.</Text>}
         {fotos.length < MAX_FOTOS && (
           <View style={styles.linha}>
             <Pressable style={[estilos.botaoSecundario, { flex: 1 }]} onPress={() => adicionarFotos('camera')}>
@@ -320,6 +339,9 @@ export default function NovaDespesa() {
             </Pressable>
             <Pressable style={[estilos.botaoSecundario, { flex: 1 }]} onPress={() => adicionarFotos('galeria')}>
               <Text style={estilos.botaoSecundarioTexto}>Da galeria</Text>
+            </Pressable>
+            <Pressable style={[estilos.botaoSecundario, { flex: 1 }]} onPress={() => adicionarFotos('pdf')}>
+              <Text style={estilos.botaoSecundarioTexto}>Arquivo PDF</Text>
             </Pressable>
           </View>
         )}
@@ -373,7 +395,7 @@ export default function NovaDespesa() {
 
       <View style={styles.linha}>
         <View style={{ flex: 1 }}>
-          <Text style={estilos.rotulo}>Km do odômetro{categoria?.exige_km ? '' : ' (opcional)'}</Text>
+          <Text style={estilos.rotulo}>Km do odômetro</Text>
           <TextInput
             style={estilos.campo}
             value={km}
@@ -429,6 +451,8 @@ const styles = StyleSheet.create({
   linha: { flexDirection: 'row', gap: 12 },
   fotos: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   miniatura: { width: 90, height: 120, borderRadius: 6, backgroundColor: cores.borda },
+  miniaturaPdf: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: cores.erro },
+  pdfTexto: { fontSize: 20, fontWeight: '700', color: cores.erro },
   dica: { fontSize: 12, color: cores.suave, marginBottom: 8 },
   campoLido: { borderColor: cores.aviso, borderWidth: 2 },
   avisoLido: { color: cores.aviso, fontWeight: '600', marginTop: 4 },

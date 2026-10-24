@@ -19,3 +19,4 @@ export const supabase = createClient(url, chaveAnon, {
 });
 
 export const BUCKET_COMPROVANTES = 'comprovantes';
+export const BUCKET_MARCA = 'marca'; // logo da empresa (pública)
