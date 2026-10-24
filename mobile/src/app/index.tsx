@@ -6,6 +6,7 @@ import {
   cacheExclusoesVistas,
   cacheLogo,
   cacheVeiculos,
+  apagarDespesas,
   listarDespesas,
   listarPendentes,
 } from '../lib/banco-local';
@@ -131,9 +132,14 @@ export default function MinhasDespesas() {
         carregarAvaliadas(perfil.id, 'excluida').catch(() => []),
         cacheExclusoesVistas.ler(),
         cacheLogo.ler(),
-      ]).then(([lista, naoEnviadas, categorias, veiculos, devolvidas, apagadas, vistas, urlLogo]) => {
+      ]).then(([listaMes, pendentesLocais, categorias, veiculos, devolvidas, apagadas, vistas, urlLogo]) => {
         const jaVistas = new Set(vistas);
         setExcluidas(apagadas.filter((d) => !jaVistas.has(d.id)));
+        // Excluída pelo gestor some do app: só fica o aviso, até o motorista tocar em "Entendi".
+        const idsExcluidos = new Set(apagadas.map((d) => d.id));
+        const lista = listaMes.filter((d) => !idsExcluidos.has(d.id));
+        const naoEnviadas = pendentesLocais.filter((d) => !idsExcluidos.has(d.id));
+        apagarDespesas([...idsExcluidos]).catch(() => undefined);
         setLogo(urlLogo);
         setDespesas(lista);
         setPendentes(naoEnviadas.length);

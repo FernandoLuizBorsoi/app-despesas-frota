@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 
 const MENU = [
   { href: "/despesas", rotulo: "Despesas" },
+  { href: "/analise", rotulo: "Análise" },
   { href: "/relatorios", rotulo: "Relatórios" },
   { href: "/veiculos", rotulo: "Veículos" },
   { href: "/motoristas", rotulo: "Motoristas" },
