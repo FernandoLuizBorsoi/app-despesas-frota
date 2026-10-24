@@ -1,4 +1,5 @@
 import { Redirect, Stack, useFocusEffect, useRouter } from 'expo-router';
+import * as Updates from 'expo-updates';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import {
@@ -95,6 +96,19 @@ async function carregarAvaliadas(motoristaId: string, situacao: 'rejeitada' | 'e
     .eq('situacao', situacao)
     .order('data');
   return (data ?? []) as Rejeitada[];
+}
+
+// Mostra se o app já recebeu alguma atualização automática, e de quando ela é.
+function textoVersao(): string {
+  const versao = `Versão ${Updates.runtimeVersion ?? ''}`;
+  if (Updates.isEmbeddedLaunch || !Updates.createdAt) return versao;
+  const quando = Updates.createdAt.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `${versao} · atualizada em ${quando}`;
 }
 
 const TEXTO_SITUACAO: Record<Situacao, string> = {
@@ -296,6 +310,7 @@ export default function MinhasDespesas() {
         contentContainerStyle={[estilos.conteudo, { paddingBottom: 100 }]}
         refreshControl={<RefreshControl refreshing={sincronizando} onRefresh={sincronizarAgora} />}
         ListEmptyComponent={<Text style={styles.vazio}>Nenhuma despesa neste mês.</Text>}
+        ListFooterComponent={<Text style={styles.versao}>{textoVersao()}</Text>}
         renderItem={({ item }) => (
           <Pressable
             style={[
@@ -410,4 +425,5 @@ const styles = StyleSheet.create({
   alertaAcao: { fontSize: 14, color: cores.primaria, fontWeight: '600', marginTop: 2 },
   itemValor: { fontSize: 16, fontWeight: '700', color: cores.texto },
   flutuante: { position: 'absolute', left: 16, right: 16, bottom: 24 },
+  versao: { fontSize: 12, color: cores.suave, textAlign: 'center', marginTop: 16 },
 });
