@@ -413,3 +413,214 @@ label.botao {
   vertical-align: middle;
   margin-right: 8px;
 }
+
+/* Análise: gráficos */
+.legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--suave);
+}
+
+.legenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legenda i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.colunas {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  height: 300px;
+  padding-left: 72px;
+}
+
+.colunas-grade {
+  position: absolute;
+  left: 72px;
+  right: 0;
+  top: 22px;
+  bottom: 24px;
+  pointer-events: none;
+}
+
+.colunas-grade div {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #eceff3;
+}
+
+.colunas-grade span {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: -8px;
+  font-size: 11px;
+  color: var(--suave);
+  white-space: nowrap;
+}
+
+.coluna {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.coluna-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 22px;
+  position: relative;
+}
+
+.coluna-total {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto);
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.coluna-pilha {
+  width: min(56px, 80%);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  min-height: 0;
+}
+
+.coluna-pilha .segmento {
+  flex-basis: 0;
+  min-height: 2px;
+  cursor: pointer;
+}
+
+.coluna-pilha .segmento:last-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.coluna-pilha .segmento:hover,
+.barra-linha:hover .barra-cheia {
+  filter: brightness(1.12);
+}
+
+.coluna-rotulo {
+  height: 24px;
+  line-height: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--suave);
+}
+
+.barras {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.barra-linha {
+  display: grid;
+  grid-template-columns: minmax(80px, 30%) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  border-radius: 6px;
+}
+
+.barra-linha.clicavel {
+  cursor: pointer;
+}
+
+.barra-linha:hover,
+.barra-linha.selecionada {
+  background: #f0f4fa;
+}
+
+.barra-linha.selecionada .barra-nome {
+  font-weight: 700;
+}
+
+.barra-nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.barra-trilho {
+  height: 14px;
+}
+
+.barra-cheia {
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+}
+
+.barra-valor {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dica-grafico {
+  font-size: 12px;
+  margin: 10px 0 0;
+}
+
+.dica-flutuante {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  background: #1b1f24;
+  color: #fff;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@media (max-width: 640px) {
+  .colunas {
+    padding-left: 56px;
+    gap: 4px;
+  }
+  .colunas-grade {
+    left: 56px;
+  }
+  .coluna-total {
+    display: none;
+  }
+}
+
+/* No celular o menu quebra em linhas em vez de vazar para fora da tela. */
+@media (max-width: 640px) {
+  .topo {
+    height: auto;
+    min-height: 56px;
+    padding: 8px 16px;
+    gap: 8px 16px;
+  }
+  .topo nav {
+    flex-wrap: wrap;
+  }
+}

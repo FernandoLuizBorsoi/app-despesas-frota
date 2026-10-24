@@ -105,6 +105,11 @@ export const cacheExclusoesVistas = {
 };
 
 // A logo é da empresa, não do motorista: fica para a próxima vez que alguém entrar.
+// Despesas que o gestor excluiu: somem do celular (continuam no servidor para consulta do gestor).
+export async function apagarDespesas(ids: string[]): Promise<void> {
+  for (const id of ids) await db.runAsync('DELETE FROM despesa WHERE id = ?', id);
+}
+
 export async function limparTudo(): Promise<void> {
   await db.execAsync("DELETE FROM despesa; DELETE FROM cache WHERE chave <> 'logo';");
 }
