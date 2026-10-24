@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { enviarFotoUsuario, linksDasFotosDeUsuarios } from "@/lib/dados";
+import { iniciais } from "@/lib/formato";
 import { supabase } from "@/lib/supabase";
 
 type Pessoa = {
@@ -10,6 +12,8 @@ type Pessoa = {
   telefone: string | null;
   perfil: "motorista" | "gestor" | "admin";
   ativo: boolean;
+  empresa_id: string;
+  foto_caminho: string | null;
 };
 
 const ROTULO_PERFIL = { motorista: "Motorista", gestor: "Gestor", admin: "Admin" };
@@ -34,15 +38,34 @@ export default function Motoristas() {
   // Aumenta a cada alteração para recarregar a lista.
   const [versao, setVersao] = useState(0);
   const recarregar = () => setVersao((v) => v + 1);
+  const [fotos, setFotos] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     supabase
       .from("usuario")
-      .select("id, nome, cpf, telefone, perfil, ativo")
+      .select("id, nome, cpf, telefone, perfil, ativo, empresa_id, foto_caminho")
       .order("ativo", { ascending: false })
       .order("nome")
-      .then(({ data, error }) => (error ? setErro(error.message) : setPessoas(data as Pessoa[])));
+      .then(async ({ data, error }) => {
+        if (error) return setErro(error.message);
+        const lista = data as Pessoa[];
+        setPessoas(lista);
+        setFotos(await linksDasFotosDeUsuarios(lista.flatMap((p) => (p.foto_caminho ? [p.foto_caminho] : []))));
+      });
   }, [versao]);
+
+  async function trocarFoto(p: Pessoa, arquivo: File | undefined) {
+    if (!arquivo) return;
+    if (!/^image\/(png|jpe?g)$/.test(arquivo.type)) return setErro("Envie uma foto em JPG ou PNG.");
+    if (arquivo.size > 5 * 1024 * 1024) return setErro("A foto precisa ter até 5 MB.");
+    setErro(null);
+    try {
+      await enviarFotoUsuario(p.empresa_id, p.id, arquivo);
+      recarregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível enviar a foto.");
+    }
+  }
 
   async function adicionar(e: React.FormEvent) {
     e.preventDefault();
@@ -150,6 +173,7 @@ export default function Motoristas() {
         <table>
           <thead>
             <tr>
+              <th>Foto</th>
               <th>Nome</th>
               <th>CPF</th>
               <th>Telefone</th>
@@ -161,6 +185,22 @@ export default function Motoristas() {
           <tbody>
             {pessoas.map((p) => (
               <tr key={p.id} style={p.ativo ? undefined : { color: "var(--suave)" }}>
+                <td>
+                  <label className="avatar" title={p.foto_caminho ? "Trocar foto" : "Enviar foto"}>
+                    {p.foto_caminho && fotos.get(p.foto_caminho) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={fotos.get(p.foto_caminho)} alt={p.nome} />
+                    ) : (
+                      <span>{iniciais(p.nome)}</span>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      hidden
+                      onChange={(e) => trocarFoto(p, e.target.files?.[0])}
+                    />
+                  </label>
+                </td>
                 <td>{p.nome}</td>
                 <td>{formatarCpf(p.cpf)}</td>
                 <td>{p.telefone}</td>
@@ -182,7 +222,8 @@ export default function Motoristas() {
         </table>
         <p className="rotulo-suave">
           Quem for desativado não consegue mais lançar despesas, mas o histórico continua nos relatórios. Se um
-          motorista esquecer a senha, use Gerar nova senha: ela passa a ser os 6 primeiros números do CPF.
+          motorista esquecer a senha, use Gerar nova senha: ela passa a ser os 6 primeiros números do CPF. Clique
+          no círculo da foto para enviar ou trocar a foto (o motorista também pode tirar a própria foto no app).
         </p>
       </div>
     </>

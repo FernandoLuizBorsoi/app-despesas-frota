@@ -1,7 +1,17 @@
 import { Redirect, Stack, useFocusEffect, useRouter } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {
   cacheCategorias,
   cacheExclusoesVistas,
@@ -12,6 +22,7 @@ import {
   listarPendentes,
 } from '../lib/banco-local';
 import { cores, estilos } from '../lib/estilos';
+import { linkDaMinhaFoto, trocarMinhaFoto } from '../lib/foto-perfil';
 import { dataTextoDeIso, formatarReais, mesAtual, nomeDoMes, somarMeses } from '../lib/formato';
 import { useSessao } from '../lib/sessao';
 import { supabase } from '../lib/supabase';
@@ -129,6 +140,8 @@ export default function MinhasDespesas() {
   // Excluídas pelo gestor que o motorista ainda não viu.
   const [excluidas, setExcluidas] = useState<Rejeitada[]>([]);
   const [logo, setLogo] = useState<string | null>(null);
+  const [foto, setFoto] = useState<string | null>(null);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [nomes, setNomes] = useState<{ categorias: Map<string, string>; placas: Map<string, string> }>({
     categorias: new Map(),
     placas: new Map(),
@@ -146,7 +159,9 @@ export default function MinhasDespesas() {
         carregarAvaliadas(perfil.id, 'excluida').catch(() => []),
         cacheExclusoesVistas.ler(),
         cacheLogo.ler(),
-      ]).then(([listaMes, pendentesLocais, categorias, veiculos, devolvidas, apagadas, vistas, urlLogo]) => {
+        linkDaMinhaFoto(perfil.id).catch(() => null),
+      ]).then(([listaMes, pendentesLocais, categorias, veiculos, devolvidas, apagadas, vistas, urlLogo, urlFoto]) => {
+        setFoto(urlFoto);
         const jaVistas = new Set(vistas);
         setExcluidas(apagadas.filter((d) => !jaVistas.has(d.id)));
         // Excluída pelo gestor some do app: só fica o aviso, até o motorista tocar em "Entendi".
@@ -209,18 +224,61 @@ export default function MinhasDespesas() {
     setExcluidas([]);
   }
 
+  async function mudarFoto(origem: 'camera' | 'galeria') {
+    if (!perfil) return;
+    setEnviandoFoto(true);
+    try {
+      const nova = await trocarMinhaFoto(perfil, origem);
+      if (nova) setFoto(nova);
+    } catch (e) {
+      Alert.alert('Foto', e instanceof Error ? e.message : 'Não foi possível trocar a foto.');
+    } finally {
+      setEnviandoFoto(false);
+    }
+  }
+
+  const escolherFoto = () =>
+    Alert.alert('Sua foto', foto ? 'Quer trocar sua foto?' : 'Coloque uma foto sua para o gestor reconhecer você.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Da galeria', onPress: () => mudarFoto('galeria') },
+      { text: 'Tirar foto', onPress: () => mudarFoto('camera') },
+    ]);
+
+  const iniciais = perfil.nome
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join('');
+
   const cabecalho = (
     <View style={{ gap: 12 }}>
       {logo && <Image source={{ uri: logo }} style={styles.logo} resizeMode="contain" />}
-      <View>
-        <Text style={styles.ola}>Olá, {perfil.nome.split(' ')[0]}</Text>
-        <Text style={[styles.status, pendentes > 0 && { color: cores.aviso }]}>
-          {sincronizando
-            ? 'Enviando...'
-            : pendentes > 0
-              ? `${pendentes} despesa(s) aguardando internet para enviar`
-              : 'Tudo enviado'}
-        </Text>
+      <View style={styles.saudacao}>
+        <Pressable onPress={escolherFoto} disabled={enviandoFoto} hitSlop={8}>
+          {enviandoFoto ? (
+            <View style={styles.avatar}>
+              <ActivityIndicator color={cores.primaria} />
+            </View>
+          ) : foto ? (
+            <Image source={{ uri: foto }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarIniciais}>{iniciais}</Text>
+              <Text style={styles.avatarDica}>foto</Text>
+            </View>
+          )}
+        </Pressable>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.ola}>Olá, {perfil.nome.split(' ')[0]}</Text>
+          <Text style={[styles.status, pendentes > 0 && { color: cores.aviso }]}>
+            {sincronizando
+              ? 'Enviando...'
+              : pendentes > 0
+                ? `${pendentes} despesa(s) aguardando internet para enviar`
+                : 'Tudo enviado'}
+          </Text>
+        </View>
       </View>
 
       {rejeitadas.length > 0 && (
@@ -360,6 +418,17 @@ const styles = StyleSheet.create({
   centro: { justifyContent: 'center', alignItems: 'center', padding: 24 },
   sair: { color: '#FFFFFF', fontSize: 15 },
   ola: { fontSize: 20, fontWeight: '700', color: cores.texto },
+  saudacao: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: cores.borda,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarIniciais: { fontSize: 18, fontWeight: '700', color: cores.primaria },
+  avatarDica: { fontSize: 10, color: cores.suave },
   status: { fontSize: 14, color: cores.sucesso, marginTop: 4 },
   seletorMes: {
     flexDirection: 'row',
