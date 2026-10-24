@@ -6,7 +6,7 @@ name: Atualizar app nos celulares
 on:
   push:
     branches: [main]
-    paths: ["mobile/**"]
+    paths: ["mobile/**", ".github/workflows/atualizar-app.yml"]
   workflow_dispatch:
 
 jobs:
@@ -16,8 +16,11 @@ jobs:
       run:
         working-directory: mobile
     steps:
+      - uses: actions/checkout@v4
+
       - name: Conferir a chave da Expo
         id: chave
+        working-directory: .
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
@@ -27,9 +30,6 @@ jobs:
           else
             echo "ok=true" >> "$GITHUB_OUTPUT"
           fi
-
-      - uses: actions/checkout@v4
-        if: steps.chave.outputs.ok == 'true'
 
       - uses: actions/setup-node@v4
         if: steps.chave.outputs.ok == 'true'
