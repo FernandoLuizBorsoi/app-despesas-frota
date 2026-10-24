@@ -126,14 +126,20 @@ export async function carregarEmpresa(): Promise<Empresa | null> {
 }
 
 // Só o administrador geral recebe a lista (as regras do banco filtram para os demais).
-export async function listarEmpresas(): Promise<{ id: string; nome: string }[]> {
-  const { data, error } = await supabase.from("empresa").select("id, nome").order("nome");
+export async function listarEmpresas(): Promise<{ id: string; nome: string; ativa: boolean }[]> {
+  const { data, error } = await supabase.from("empresa").select("id, nome, ativa").order("nome");
   if (error) throw error;
   return data;
 }
 
 export async function trocarEmpresa(empresaId: string) {
   const { error } = await supabase.rpc("trocar_empresa", { p_empresa: empresaId });
+  if (error) throw error;
+}
+
+// Empresa desativada: gestores e motoristas dela perdem o acesso na hora (o histórico fica guardado).
+export async function ativarEmpresa(empresaId: string, ativa: boolean) {
+  const { error } = await supabase.from("empresa").update({ ativa }).eq("id", empresaId);
   if (error) throw error;
 }
 

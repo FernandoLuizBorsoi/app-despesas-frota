@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { carregarEmpresa, criarEmpresa, listarEmpresas, trocarEmpresa } from "@/lib/dados";
+import { ativarEmpresa, carregarEmpresa, criarEmpresa, listarEmpresas, trocarEmpresa } from "@/lib/dados";
 
-type Empresa = { id: string; nome: string };
+type Empresa = { id: string; nome: string; ativa: boolean };
 
 // Só para o administrador geral: lista as empresas, cria novas e entra em uma delas.
 export default function Empresas() {
@@ -26,6 +26,20 @@ export default function Empresas() {
       window.location.href = destino;
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível trocar de empresa.");
+    }
+  }
+
+  async function alternar(emp: Empresa) {
+    const pergunta = emp.ativa
+      ? `Desativar ${emp.nome}? Todos os gestores e motoristas dela perdem o acesso na hora. As despesas ficam guardadas e você pode reativar quando quiser.`
+      : `Reativar ${emp.nome}? Gestores e motoristas ativos dela voltam a ter acesso.`;
+    if (!confirm(pergunta)) return;
+    setErro(null);
+    try {
+      await ativarEmpresa(emp.id, !emp.ativa);
+      setEmpresas(await listarEmpresas());
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível alterar a empresa.");
     }
   }
 
@@ -64,13 +78,15 @@ export default function Empresas() {
           <thead>
             <tr>
               <th>Empresa</th>
+              <th>Situação</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {(empresas ?? []).map((emp) => (
-              <tr key={emp.id}>
+              <tr key={emp.id} style={emp.ativa ? undefined : { color: "var(--suave)" }}>
                 <td>{emp.nome}</td>
+                <td>{emp.ativa ? "Ativa" : "Desativada"}</td>
                 <td className="acoes">
                   {emp.id === atual ? (
                     <span className="rotulo-suave">Você está nesta</span>
@@ -79,6 +95,9 @@ export default function Empresas() {
                       Entrar
                     </button>
                   )}
+                  <button className="botao secundario" onClick={() => alternar(emp)}>
+                    {emp.ativa ? "Desativar" : "Reativar"}
+                  </button>
                 </td>
               </tr>
             ))}
@@ -87,7 +106,8 @@ export default function Empresas() {
         <p className="rotulo-suave">
           Ao criar uma empresa você entra nela e vai para Motoristas e gestores: cadastre ali o primeiro gestor
           (Perfil &quot;Gestor&quot;, com e-mail e senha). Cada gestor só vê a própria empresa. Você troca de empresa
-          aqui ou na caixa do topo do painel. Toda empresa nova já começa com as 8 categorias padrão.
+          aqui ou na caixa do topo do painel. Toda empresa nova já começa com as 8 categorias padrão. Desativar
+          uma empresa bloqueia na hora o painel dos gestores e o app dos motoristas dela; nada é apagado.
         </p>
       </div>
     </>

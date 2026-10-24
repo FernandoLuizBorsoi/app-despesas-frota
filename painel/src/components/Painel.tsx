@@ -24,6 +24,7 @@ type Estado =
   | { tipo: "carregando" }
   | { tipo: "deslogado" }
   | { tipo: "sem-permissao" }
+  | { tipo: "bloqueado" }
   | {
       tipo: "ok";
       nome: string;
@@ -31,7 +32,7 @@ type Estado =
       empresaId: string | null;
       logo: string | null;
       // Preenchida só para o administrador geral.
-      empresas: { id: string; nome: string }[] | null;
+      empresas: { id: string; nome: string; ativa: boolean }[] | null;
     };
 
 // Envolve todas as páginas (menos /app): exige login e perfil de gestor ou admin.
@@ -45,6 +46,8 @@ export function Painel({ children }: { children: ReactNode }) {
       const { data } = await supabase.from("usuario").select("nome, perfil").eq("id", sessao.user.id).single();
       if (!data || data.perfil === "motorista") return setEstado({ tipo: "sem-permissao" });
       const empresa = await carregarEmpresa();
+      // Sem empresa visível: o próprio acesso ou a empresa foi desativada.
+      if (!empresa && data.perfil !== "admin") return setEstado({ tipo: "bloqueado" });
       const empresas = data.perfil === "admin" ? await listarEmpresas().catch(() => null) : null;
       setEstado({
         tipo: "ok",
@@ -66,11 +69,15 @@ export function Painel({ children }: { children: ReactNode }) {
   if (caminho === "/app") return <>{children}</>;
   if (estado.tipo === "carregando") return <div className="centro">Carregando...</div>;
   if (estado.tipo === "deslogado") return <Login />;
-  if (estado.tipo === "sem-permissao") {
+  if (estado.tipo === "sem-permissao" || estado.tipo === "bloqueado") {
     return (
       <div className="centro">
         <div className="login">
-          <p>Este painel é só para gestores. Motoristas usam o app no celular.</p>
+          <p>
+            {estado.tipo === "bloqueado"
+              ? "Seu acesso está bloqueado. Fale com o administrador do sistema."
+              : "Este painel é só para gestores. Motoristas usam o app no celular."}
+          </p>
           <button className="botao secundario" onClick={() => supabase.auth.signOut()}>
             Sair
           </button>
@@ -98,6 +105,7 @@ export function Painel({ children }: { children: ReactNode }) {
               {estado.empresas.map((emp) => (
                 <option key={emp.id} value={emp.id}>
                   {emp.nome}
+                  {emp.ativa ? "" : " (desativada)"}
                 </option>
               ))}
             </select>
