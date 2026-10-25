@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { enviarFotoUsuario, linksDasFotosDeUsuarios } from "@/lib/dados";
+import { enviarFotoUsuario, excluirDeVez, linksDasFotosDeUsuarios, ocultar } from "@/lib/dados";
 import { iniciais } from "@/lib/formato";
 import { supabase } from "@/lib/supabase";
 
@@ -14,6 +14,7 @@ type Pessoa = {
   ativo: boolean;
   empresa_id: string;
   foto_caminho: string | null;
+  oculto: boolean;
 };
 
 const ROTULO_PERFIL = { motorista: "Motorista", gestor: "Gestor", admin: "Administrador geral" };
@@ -48,7 +49,7 @@ export default function Motoristas() {
   useEffect(() => {
     supabase
       .from("usuario")
-      .select("id, nome, cpf, telefone, perfil, ativo, empresa_id, foto_caminho")
+      .select("id, nome, cpf, telefone, perfil, ativo, empresa_id, foto_caminho, oculto")
       .order("ativo", { ascending: false })
       .order("nome")
       .then(async ({ data, error }) => {
@@ -121,6 +122,31 @@ export default function Motoristas() {
       return;
     }
     setAviso(`Nova senha de ${p.nome}: ${padrao}.`);
+  }
+
+  const souAdmin = pessoas.some((p) => p.id === meuId && p.perfil === "admin");
+
+  async function alternarOculto(p: Pessoa) {
+    const pergunta = p.oculto
+      ? `Mostrar ${p.nome} de novo para os gestores? Ele continua desativado até alguém clicar em Reativar.`
+      : `Ocultar ${p.nome}? Ele perde o acesso e some da visão dos gestores, junto com as despesas dele. Só você continua vendo.`;
+    if (!confirm(pergunta)) return;
+    try {
+      await ocultar("usuario", p.id, !p.oculto);
+      recarregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível alterar.");
+    }
+  }
+
+  async function excluir(p: Pessoa) {
+    if (!confirm(`Excluir ${p.nome} DE VEZ? Todas as despesas e fotos dele também serão apagadas. Isso não tem volta.`)) return;
+    try {
+      await excluirDeVez("motorista", p.id);
+      recarregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível excluir.");
+    }
   }
 
   async function alternarAtivo(p: Pessoa) {
@@ -211,7 +237,7 @@ export default function Motoristas() {
                 <td>{formatarCpf(p.cpf)}</td>
                 <td>{p.telefone}</td>
                 <td>{ROTULO_PERFIL[p.perfil]}</td>
-                <td>{p.ativo ? "Ativo" : "Inativo"}</td>
+                <td>{p.oculto ? "Oculto (só você vê)" : p.ativo ? "Ativo" : "Inativo"}</td>
                 <td className="acoes">
                   {p.cpf && p.perfil === "motorista" && (
                     <button className="botao secundario" onClick={() => senhaPadrao(p)}>
@@ -226,6 +252,16 @@ export default function Motoristas() {
                       {p.ativo ? "Desativar" : "Reativar"}
                     </button>
                   )}
+                  {souAdmin && p.id !== meuId && (
+                    <>
+                      <button className="botao secundario" onClick={() => alternarOculto(p)}>
+                        {p.oculto ? "Mostrar" : "Ocultar"}
+                      </button>
+                      <button className="botao perigo" onClick={() => excluir(p)}>
+                        Excluir
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
@@ -236,6 +272,8 @@ export default function Motoristas() {
           Quem for desativado não consegue mais lançar despesas, mas o histórico continua nos relatórios. Se um
           motorista esquecer a senha, use Gerar nova senha: ela passa a ser os 6 primeiros números do CPF. Clique
           no círculo da foto para enviar ou trocar a foto (o motorista também pode tirar a própria foto no app).
+          {souAdmin &&
+            " Só você (administrador) vê Ocultar e Excluir: ocultar some com a pessoa e as despesas dela da visão do gestor; excluir apaga de vez."}
         </p>
       </div>
     </>

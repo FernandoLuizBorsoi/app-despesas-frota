@@ -9,6 +9,7 @@ export type Veiculo = {
   ano: number | null;
   km_atual: number;
   ativo: boolean;
+  oculto?: boolean;
 };
 
 export type Despesa = {
@@ -144,6 +145,24 @@ export async function ligarMarcaDagua(empresa: Empresa, ligada: boolean) {
 
 export async function ligarManutencao(empresa: Empresa, ligada: boolean) {
   const { error } = await supabase.from("empresa").update({ manutencao_ativa: ligada }).eq("id", empresa.id);
+  if (error) throw error;
+}
+
+// Só o administrador geral: ocultar some da visão do gestor e do app (o histórico fica guardado);
+// excluir apaga de vez, junto com as despesas ligadas.
+export async function ocultar(tabela: "usuario" | "veiculo", id: string, oculto: boolean) {
+  const { error } = await supabase
+    .from(tabela)
+    .update(oculto ? { oculto, ativo: false } : { oculto })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function excluirDeVez(tipo: "motorista" | "veiculo", id: string) {
+  const { error } =
+    tipo === "motorista"
+      ? await supabase.rpc("excluir_motorista", { p_usuario: id })
+      : await supabase.rpc("excluir_veiculo", { p_veiculo: id });
   if (error) throw error;
 }
 
