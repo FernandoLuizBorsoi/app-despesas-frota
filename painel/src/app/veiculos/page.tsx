@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Veiculo } from "@/lib/dados";
+import { excluirDeVez, ocultar, type Veiculo } from "@/lib/dados";
 import { numero } from "@/lib/formato";
 import { supabase } from "@/lib/supabase";
 
@@ -13,6 +13,7 @@ export default function Veiculos() {
   const [modelo, setModelo] = useState("");
   const [ano, setAno] = useState("");
   const [km, setKm] = useState("");
+  const [souAdmin, setSouAdmin] = useState(false);
 
   // Aumenta a cada alteração para recarregar a lista.
   const [versao, setVersao] = useState(0);
@@ -21,7 +22,7 @@ export default function Veiculos() {
   useEffect(() => {
     supabase
       .from("veiculo")
-      .select("id, placa, modelo, ano, km_atual, ativo")
+      .select("id, placa, modelo, ano, km_atual, ativo, oculto")
       .order("ativo", { ascending: false })
       .order("placa")
       .then(({ data, error }) => (error ? setErro(error.message) : setVeiculos(data as Veiculo[])));
@@ -30,8 +31,9 @@ export default function Veiculos() {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
-      const { data: usuario } = await supabase.from("usuario").select("empresa_id").eq("id", data.user.id).single();
+      const { data: usuario } = await supabase.from("usuario").select("empresa_id, perfil").eq("id", data.user.id).single();
       setEmpresaId(usuario?.empresa_id ?? null);
+      setSouAdmin(usuario?.perfil === "admin");
     });
   }, []);
 
@@ -59,6 +61,29 @@ export default function Veiculos() {
     setAno("");
     setKm("");
     recarregar();
+  }
+
+  async function alternarOculto(v: Veiculo) {
+    const pergunta = v.oculto
+      ? `Mostrar ${v.placa} de novo para os gestores? Ele continua inativo até alguém clicar em Reativar.`
+      : `Ocultar ${v.placa}? Ele some do app e da visão dos gestores, junto com as despesas dele. Só você continua vendo.`;
+    if (!confirm(pergunta)) return;
+    try {
+      await ocultar("veiculo", v.id, !v.oculto);
+      recarregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível alterar.");
+    }
+  }
+
+  async function excluir(v: Veiculo) {
+    if (!confirm(`Excluir ${v.placa} DE VEZ? Todas as despesas desse veículo também serão apagadas. Isso não tem volta.`)) return;
+    try {
+      await excluirDeVez("veiculo", v.id);
+      recarregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível excluir.");
+    }
   }
 
   async function alternarAtivo(v: Veiculo) {
@@ -112,11 +137,21 @@ export default function Veiculos() {
                 <td>{v.modelo}</td>
                 <td>{v.ano}</td>
                 <td className="numero">{numero(v.km_atual)}</td>
-                <td>{v.ativo ? "Ativo" : "Inativo"}</td>
-                <td>
+                <td>{v.oculto ? "Oculto (só você vê)" : v.ativo ? "Ativo" : "Inativo"}</td>
+                <td className="acoes">
                   <button className="botao secundario" onClick={() => alternarAtivo(v)}>
                     {v.ativo ? "Desativar" : "Reativar"}
                   </button>
+                  {souAdmin && (
+                    <>
+                      <button className="botao secundario" onClick={() => alternarOculto(v)}>
+                        {v.oculto ? "Mostrar" : "Ocultar"}
+                      </button>
+                      <button className="botao perigo" onClick={() => excluir(v)}>
+                        Excluir
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
