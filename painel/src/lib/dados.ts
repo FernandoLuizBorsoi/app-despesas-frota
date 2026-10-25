@@ -110,7 +110,7 @@ export function hoje(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export type Empresa = { id: string; nome: string; logo_caminho: string | null; marca_dagua: boolean };
+export type Empresa = { id: string; nome: string; logo_caminho: string | null; marca_dagua: boolean; manutencao_ativa: boolean };
 
 // A empresa de quem está logado. O administrador geral enxerga todas, por isso filtra pelo usuário.
 export async function carregarEmpresa(): Promise<Empresa | null> {
@@ -119,7 +119,7 @@ export async function carregarEmpresa(): Promise<Empresa | null> {
   if (!id) return null;
   const { data } = await supabase
     .from("usuario")
-    .select("empresa:empresa_id (id, nome, logo_caminho, marca_dagua)")
+    .select("empresa:empresa_id (id, nome, logo_caminho, marca_dagua, manutencao_ativa)")
     .eq("id", id)
     .maybeSingle();
   return (data?.empresa as unknown as Empresa) ?? null;
@@ -139,6 +139,11 @@ export async function trocarEmpresa(empresaId: string) {
 
 export async function ligarMarcaDagua(empresa: Empresa, ligada: boolean) {
   const { error } = await supabase.from("empresa").update({ marca_dagua: ligada }).eq("id", empresa.id);
+  if (error) throw error;
+}
+
+export async function ligarManutencao(empresa: Empresa, ligada: boolean) {
+  const { error } = await supabase.from("empresa").update({ manutencao_ativa: ligada }).eq("id", empresa.id);
   if (error) throw error;
 }
 
