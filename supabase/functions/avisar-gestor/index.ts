@@ -4,9 +4,12 @@
 // então chamar de novo não manda e-mail repetido.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import nodemailer from "npm:nodemailer@6.9.16";
 
 const PAINEL = "https://app-despesas-frota-gzo8.vercel.app/despesas";
-const REMETENTE = "Despesas da Frota <onboarding@resend.dev>";
+// Sem domínio próprio no Resend, ele só entrega no e-mail do dono da conta.
+// Com GMAIL_USUARIO e GMAIL_SENHA_APP configurados, envia por esse Gmail para qualquer gestor.
+const REMETENTE_RESEND = "Despesas da Frota <onboarding@resend.dev>";
 const JANELA_MINUTOS = 10;
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -60,9 +63,44 @@ function montarEmail(d: Despesa, corrigida: boolean) {
   return { assunto, html };
 }
 
-Deno.serve(async (req) => {
+type Enviar = (para: string, assunto: string, html: string) => Promise<string | null>;
+
+// Devolve a função que manda um e-mail (null = enviado, texto = erro).
+function escolherEnvio(): Enviar | null {
+  const usuario = Deno.env.get("GMAIL_USUARIO");
+  const senha = Deno.env.get("GMAIL_SENHA_APP");
+  if (usuario && senha) {
+    // Porta 465: as funções do Supabase bloqueiam a 587.
+    const gmail = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: { user: usuario, pass: senha.replace(/\s/g, "") },
+    });
+    return async (para, assunto, html) => {
+      try {
+        await gmail.sendMail({ from: `Despesas da Frota <${usuario}>`, to: para, subject: assunto, html });
+        return null;
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e);
+      }
+    };
+  }
   const chave = Deno.env.get("RESEND_API_KEY");
-  if (!chave) return resposta(200, { ok: false, motivo: "RESEND_API_KEY não configurada" });
+  if (!chave) return null;
+  return async (para, assunto, html) => {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: REMETENTE_RESEND, to: [para], subject: assunto, html }),
+    });
+    return r.ok ? null : `${r.status} ${await r.text()}`;
+  };
+}
+
+Deno.serve(async (req) => {
+  const enviar = escolherEnvio();
+  if (!enviar) return resposta(200, { ok: false, motivo: "nenhum envio de e-mail configurado" });
 
   const { id } = await req.json().catch(() => ({}));
   if (typeof id !== "string") return resposta(400, { erro: "id obrigatório" });
@@ -105,13 +143,9 @@ Deno.serve(async (req) => {
     const { data: u } = await supabase.auth.admin.getUserById(g.id);
     const email = u.user?.email;
     if (!email || email.endsWith(".invalid")) continue;
-    const r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: REMETENTE, to: [email], subject: assunto, html }),
-    });
-    if (r.ok) enviados.push(email);
-    else falhas.push(`${email}: ${r.status} ${await r.text()}`);
+    const falha = await enviar(email, assunto, html);
+    if (falha) falhas.push(`${email}: ${falha}`);
+    else enviados.push(email);
   }
   if (falhas.length) console.error("Falha ao enviar e-mail", falhas);
   return resposta(200, { ok: true, enviados: enviados.length, falhas: falhas.length });
