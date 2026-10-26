@@ -1,4 +1,4 @@
-// Manda e-mail aos gestores quando chega uma despesa nova ou corrigida.
+// Manda e-mail aos gestores da empresa quando chega uma despesa nova ou corrigida.
 // É chamada pelo próprio banco (gatilho despesa_avisar_gestor), só com o id da despesa.
 // Não precisa de login: só avisa sobre despesa que acabou de chegar e ainda não foi avisada,
 // então chamar de novo não manda e-mail repetido.
@@ -94,9 +94,9 @@ Deno.serve(async (req) => {
   const { data: gestores } = await supabase
     .from("usuario")
     .select("id")
-    .in("perfil", ["gestor", "admin"])
-    // Gestores da empresa e o administrador geral (que acompanha todas as empresas).
-    .or(`empresa_id.eq.${d.empresa_id},perfil.eq.admin`)
+    .eq("empresa_id", d.empresa_id)
+    // Só os gestores da empresa; o administrador geral não recebe (pedido do Fernando).
+    .eq("perfil", "gestor")
     .eq("ativo", true);
 
   const enviados: string[] = [];
