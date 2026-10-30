@@ -87,6 +87,9 @@ export default function NovaDespesa() {
 
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [veiculoId, setVeiculoId] = useState<string | null>(null);
+  // Placa que o gestor ligou ao motorista: só ela aparece, a não ser que ele peça outra.
+  const [veiculoFixo, setVeiculoFixo] = useState<string | null>(null);
+  const [verTodosVeiculos, setVerTodosVeiculos] = useState(false);
   const [valor, setValor] = useState('');
   const valorAtual = useRef(valor);
   valorAtual.current = valor;
@@ -112,11 +115,13 @@ export default function NovaDespesa() {
       ([v, c, anteriores, perfil]) => {
         setVeiculos(v ?? []);
         setCategorias(c ?? []);
+        const fixo = perfil?.veiculo_id;
+        const temFixo = Boolean(fixo && v?.some((x) => x.id === fixo));
+        if (temFixo) setVeiculoFixo(fixo!);
         if (idCorrecao) return;
         // Primeiro a placa que o gestor ligou ao motorista; sem ela, a da última despesa.
-        const fixo = perfil?.veiculo_id;
         const ultimo = anteriores[0]?.veiculo_id;
-        if (fixo && v?.some((x) => x.id === fixo)) setVeiculoId(fixo);
+        if (temFixo) setVeiculoId(fixo!);
         else if (ultimo && v?.some((x) => x.id === ultimo)) setVeiculoId(ultimo);
         else if (v?.length === 1) setVeiculoId(v[0].id);
       },
@@ -182,6 +187,8 @@ export default function NovaDespesa() {
 
   const categoria = categorias.find((c) => c.id === categoriaId);
   const veiculo = veiculos.find((v) => v.id === veiculoId);
+  // Numa correção com outra placa, mostra todas para não esconder a que já estava escolhida.
+  const soVeiculoFixo = Boolean(veiculoFixo) && !verTodosVeiculos && (!veiculoId || veiculoId === veiculoFixo);
 
   async function adicionarFotos(origem: 'camera' | 'galeria' | 'pdf') {
     try {
@@ -363,10 +370,18 @@ export default function NovaDespesa() {
       <View>
         <Text style={estilos.rotulo}>Veículo</Text>
         <Chips
-          opcoes={veiculos.map((v) => ({ valor: v.id, rotulo: v.placa }))}
+          opcoes={(soVeiculoFixo ? veiculos.filter((v) => v.id === veiculoFixo) : veiculos).map((v) => ({
+            valor: v.id,
+            rotulo: v.placa,
+          }))}
           selecionado={veiculoId}
           aoEscolher={setVeiculoId}
         />
+        {soVeiculoFixo && veiculos.length > 1 && (
+          <Pressable onPress={() => setVerTodosVeiculos(true)}>
+            <Text style={styles.outroVeiculo}>Estou em outro veículo</Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.linha}>
@@ -458,6 +473,7 @@ const styles = StyleSheet.create({
   miniaturaPdf: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: cores.erro },
   pdfTexto: { fontSize: 20, fontWeight: '700', color: cores.erro },
   dica: { fontSize: 12, color: cores.suave, marginBottom: 8 },
+  outroVeiculo: { color: cores.primaria, fontSize: 14, marginTop: 6, textDecorationLine: 'underline' },
   campoLido: { borderColor: cores.aviso, borderWidth: 2 },
   avisoLido: { color: cores.aviso, fontWeight: '600', marginTop: 4 },
   motivo: { backgroundColor: '#FDECEA', borderColor: cores.erro, borderWidth: 1, borderRadius: 8, padding: 12 },
