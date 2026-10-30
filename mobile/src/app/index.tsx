@@ -412,7 +412,10 @@ export default function MinhasDespesas() {
         )}
       />
       {marcaDagua && logo && (
-        <Image source={{ uri: logo }} style={styles.marcaDagua} resizeMode="contain" pointerEvents="none" />
+        // A View é que deixa os toques passarem: na Image o pointerEvents não vale, e a marca d'água tampava botões.
+        <View style={styles.marcaDagua} pointerEvents="none">
+          <Image source={{ uri: logo }} style={styles.marcaDaguaImagem} resizeMode="contain" />
+        </View>
       )}
       <Pressable style={[estilos.botao, styles.flutuante]} onPress={() => router.push('/nova')}>
         <Text style={estilos.botaoTexto}>+ Nova despesa</Text>
@@ -479,6 +482,7 @@ const styles = StyleSheet.create({
   logo: { width: '100%', height: 70 },
   // Logo grande e bem clarinha por cima da tela, sem atrapalhar os toques.
   marcaDagua: { position: 'absolute', top: '25%', left: '10%', width: '80%', height: '50%', opacity: 0.1 },
+  marcaDaguaImagem: { width: '100%', height: '100%' },
   avisoExclusao: {
     backgroundColor: '#EEF0F3',
     borderColor: cores.suave,
