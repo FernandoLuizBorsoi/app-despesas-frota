@@ -94,6 +94,7 @@ export default function NovaDespesa() {
   const valorAtual = useRef(valor);
   valorAtual.current = valor;
   const [data, setData] = useState(hojeTexto());
+  // O km não é mais pedido (pedido do Fernando); só se mantém o de uma despesa antiga ao corrigir.
   const [km, setKm] = useState('');
   const [litros, setLitros] = useState('');
   const [formaPagamento, setFormaPagamento] = useState<string | null>(null);
@@ -222,8 +223,6 @@ export default function NovaDespesa() {
     if (!dataIso) return 'Informe a data no formato DD/MM/AAAA.';
     if (dataIso > new Date().toISOString().slice(0, 10)) return 'A data não pode ser no futuro.';
     const kmNumero = numeroDeTexto(km);
-    if (kmNumero === null) return 'Informe o km do odômetro.';
-    if (!Number.isInteger(kmNumero) || kmNumero < 0) return 'O km deve ser um número inteiro.';
     const litrosNumero = numeroDeTexto(litros);
     if (categoria.exige_litros && (litrosNumero === null || litrosNumero <= 0)) return 'Informe os litros abastecidos.';
     if (fotos.length === 0) return 'Anexe o comprovante: tire uma foto ou escolha o arquivo.';
@@ -270,25 +269,10 @@ export default function NovaDespesa() {
           text: 'Está certo',
           onPress: () => {
             setValorLido(false);
-            conferirKm(dados);
+            gravar(dados);
           },
         },
       ]);
-      return;
-    }
-    conferirKm(dados);
-  }
-
-  function conferirKm(dados: Exclude<ReturnType<typeof validar>, string>) {
-    if (veiculo && dados.kmNumero < veiculo.km_atual) {
-      Alert.alert(
-        'Confira o km',
-        `O último km registrado para ${veiculo.placa} é ${veiculo.km_atual.toLocaleString('pt-BR')}. Salvar mesmo assim?`,
-        [
-          { text: 'Corrigir', style: 'cancel' },
-          { text: 'Salvar', onPress: () => gravar(dados) },
-        ],
-      );
       return;
     }
     gravar(dados);
@@ -412,30 +396,18 @@ export default function NovaDespesa() {
         </View>
       </View>
 
-      <View style={styles.linha}>
-        <View style={{ flex: 1 }}>
-          <Text style={estilos.rotulo}>Km do odômetro</Text>
+      {categoria?.exige_litros && (
+        <View>
+          <Text style={estilos.rotulo}>Litros</Text>
           <TextInput
             style={estilos.campo}
-            value={km}
-            onChangeText={setKm}
-            keyboardType="number-pad"
-            placeholder={veiculo ? `Último: ${veiculo.km_atual.toLocaleString('pt-BR')}` : ''}
+            value={litros}
+            onChangeText={setLitros}
+            keyboardType="decimal-pad"
+            placeholder="0,000"
           />
         </View>
-        {categoria?.exige_litros && (
-          <View style={{ flex: 1 }}>
-            <Text style={estilos.rotulo}>Litros</Text>
-            <TextInput
-              style={estilos.campo}
-              value={litros}
-              onChangeText={setLitros}
-              keyboardType="decimal-pad"
-              placeholder="0,000"
-            />
-          </View>
-        )}
-      </View>
+      )}
 
       <View>
         <Text style={estilos.rotulo}>Forma de pagamento</Text>
