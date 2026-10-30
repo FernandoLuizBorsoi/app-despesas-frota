@@ -15,7 +15,10 @@ type Pessoa = {
   empresa_id: string;
   foto_caminho: string | null;
   oculto: boolean;
+  veiculo_id: string | null;
 };
+
+type Placa = { id: string; placa: string };
 
 const ROTULO_PERFIL = { motorista: "Motorista", gestor: "Gestor", admin: "Administrador geral" };
 
@@ -41,15 +44,22 @@ export default function Motoristas() {
   const recarregar = () => setVersao((v) => v + 1);
   const [fotos, setFotos] = useState<Map<string, string>>(new Map());
   const [meuId, setMeuId] = useState<string | null>(null);
+  const [placas, setPlacas] = useState<Placa[]>([]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setMeuId(data.user?.id ?? null));
+    supabase
+      .from("veiculo")
+      .select("id, placa")
+      .eq("ativo", true)
+      .order("placa")
+      .then(({ data }) => setPlacas((data as Placa[]) ?? []));
   }, []);
 
   useEffect(() => {
     supabase
       .from("usuario")
-      .select("id, nome, cpf, telefone, perfil, ativo, empresa_id, foto_caminho, oculto")
+      .select("id, nome, cpf, telefone, perfil, ativo, empresa_id, foto_caminho, oculto, veiculo_id")
       .order("ativo", { ascending: false })
       .order("nome")
       .then(async ({ data, error }) => {
@@ -149,6 +159,14 @@ export default function Motoristas() {
     }
   }
 
+  // O app já abre a despesa com essa placa marcada; o motorista ainda pode trocar.
+  async function trocarVeiculo(p: Pessoa, veiculoId: string) {
+    setErro(null);
+    const { error } = await supabase.from("usuario").update({ veiculo_id: veiculoId || null }).eq("id", p.id);
+    if (error) setErro(error.message);
+    else recarregar();
+  }
+
   async function alternarAtivo(p: Pessoa) {
     const { error } = await supabase.from("usuario").update({ ativo: !p.ativo }).eq("id", p.id);
     if (error) setErro(error.message);
@@ -209,6 +227,7 @@ export default function Motoristas() {
               <th>CPF</th>
               <th>Telefone</th>
               <th>Perfil</th>
+              <th>Veículo</th>
               <th>Situação</th>
               <th></th>
             </tr>
@@ -237,6 +256,18 @@ export default function Motoristas() {
                 <td>{formatarCpf(p.cpf)}</td>
                 <td>{p.telefone}</td>
                 <td>{ROTULO_PERFIL[p.perfil]}</td>
+                <td>
+                  {p.perfil === "motorista" && (
+                    <select value={p.veiculo_id ?? ""} onChange={(e) => trocarVeiculo(p, e.target.value)}>
+                      <option value="">Nenhum</option>
+                      {placas.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.placa}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </td>
                 <td>{p.oculto ? "Oculto (só você vê)" : p.ativo ? "Ativo" : "Inativo"}</td>
                 <td className="acoes">
                   {p.cpf && p.perfil === "motorista" && (
@@ -272,6 +303,8 @@ export default function Motoristas() {
           Quem for desativado não consegue mais lançar despesas, mas o histórico continua nos relatórios. Se um
           motorista esquecer a senha, use Gerar nova senha: ela passa a ser os 6 primeiros números do CPF. Clique
           no círculo da foto para enviar ou trocar a foto (o motorista também pode tirar a própria foto no app).
+          Em Veículo, escolha a placa de cada motorista: o app já abre a despesa com ela marcada, e ele pode
+          trocar se estiver em outro caminhão.
           {souAdmin &&
             " Só você (administrador) vê Ocultar e Excluir: ocultar some com a pessoa e as despesas dela da visão do gestor; excluir apaga de vez."}
         </p>

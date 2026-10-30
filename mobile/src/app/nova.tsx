@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { cacheCategorias, cacheVeiculos, listarDespesas, salvarDespesa } from '../lib/banco-local';
+import { cacheCategorias, cachePerfil, cacheVeiculos, listarDespesas, salvarDespesa } from '../lib/banco-local';
 import { cores, estilos } from '../lib/estilos';
 import { centavosDeTexto, dataIsoDeTexto, dataTextoDeIso, hojeTexto, numeroDeTexto } from '../lib/formato';
 import {
@@ -108,15 +108,19 @@ export default function NovaDespesa() {
   const [linksRemotos, setLinksRemotos] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
-    Promise.all([cacheVeiculos.ler(), cacheCategorias.ler(), listarDespesas()]).then(([v, c, anteriores]) => {
-      setVeiculos(v ?? []);
-      setCategorias(c ?? []);
-      if (idCorrecao) return;
-      // O motorista costuma usar sempre o mesmo veículo: já deixa o último selecionado.
-      const ultimo = anteriores[0]?.veiculo_id;
-      if (ultimo && v?.some((x) => x.id === ultimo)) setVeiculoId(ultimo);
-      else if (v?.length === 1) setVeiculoId(v[0].id);
-    });
+    Promise.all([cacheVeiculos.ler(), cacheCategorias.ler(), listarDespesas(), cachePerfil.ler()]).then(
+      ([v, c, anteriores, perfil]) => {
+        setVeiculos(v ?? []);
+        setCategorias(c ?? []);
+        if (idCorrecao) return;
+        // Primeiro a placa que o gestor ligou ao motorista; sem ela, a da última despesa.
+        const fixo = perfil?.veiculo_id;
+        const ultimo = anteriores[0]?.veiculo_id;
+        if (fixo && v?.some((x) => x.id === fixo)) setVeiculoId(fixo);
+        else if (ultimo && v?.some((x) => x.id === ultimo)) setVeiculoId(ultimo);
+        else if (v?.length === 1) setVeiculoId(v[0].id);
+      },
+    );
   }, [idCorrecao]);
 
   useEffect(() => {
