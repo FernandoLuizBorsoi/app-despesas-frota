@@ -26,7 +26,7 @@ import { cores, estilos } from '../lib/estilos';
 import { linkDaMinhaFoto, trocarMinhaFoto } from '../lib/foto-perfil';
 import { dataTextoDeIso, formatarReais, mesAtual, nomeDoMes, somarMeses } from '../lib/formato';
 import { useSessao } from '../lib/sessao';
-import { supabase } from '../lib/supabase';
+import { BUCKET_COMPROVANTES, supabase } from '../lib/supabase';
 import type { Situacao } from '../lib/tipos';
 
 // Despesa como aparece na lista: as do servidor e as que ainda estão só no celular.
@@ -110,6 +110,17 @@ async function carregarAvaliadas(motoristaId: string, situacao: 'rejeitada' | 'e
   return (data ?? []) as Rejeitada[];
 }
 
+// Depois do "Entendi", a despesa excluída sai do banco de vez, com as fotos.
+// Sem internet fica para a próxima vez que a tela abrir.
+async function apagarExcluidas(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { data } = await supabase.from('comprovante').select('caminho').in('despesa_id', ids);
+  const caminhos = (data ?? []).map((c: { caminho: string }) => c.caminho);
+  if (caminhos.length) await supabase.storage.from(BUCKET_COMPROVANTES).remove(caminhos);
+  const { error } = await supabase.rpc('apagar_excluidas', { p_ids: ids });
+  if (error) throw error;
+}
+
 // Mostra se o app já recebeu alguma atualização automática, e de quando ela é.
 function textoVersao(): string {
   const versao = `Versão ${Updates.runtimeVersion ?? ''}`;
@@ -168,6 +179,7 @@ export default function MinhasDespesas() {
         setMarcaDagua(marca);
         const jaVistas = new Set(vistas);
         setExcluidas(apagadas.filter((d) => !jaVistas.has(d.id)));
+        apagarExcluidas(apagadas.filter((d) => jaVistas.has(d.id)).map((d) => d.id)).catch(() => undefined);
         // Excluída pelo gestor some do app: só fica o aviso, até o motorista tocar em "Entendi".
         const idsExcluidos = new Set(apagadas.map((d) => d.id));
         const lista = listaMes.filter((d) => !idsExcluidos.has(d.id));
@@ -226,6 +238,7 @@ export default function MinhasDespesas() {
     const vistas = await cacheExclusoesVistas.ler();
     await cacheExclusoesVistas.gravar([...new Set([...vistas, ...excluidas.map((d) => d.id)])]);
     setExcluidas([]);
+    apagarExcluidas(excluidas.map((d) => d.id)).catch(() => undefined);
   }
 
   async function mudarFoto(origem: 'camera' | 'galeria') {
