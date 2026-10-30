@@ -29,7 +29,15 @@ export async function carregarPerfil(usuarioId: string): Promise<Perfil> {
   if (!data.ativo || !data.empresa) {
     throw new Error('Seu acesso está bloqueado. Fale com o gestor da sua empresa.');
   }
-  const perfil: Perfil = { id: data.id, empresa_id: data.empresa_id, nome: data.nome, perfil: data.perfil };
+  // Lido à parte: se a coluna ainda não existir no banco, o login continua funcionando.
+  const { data: fixo } = await supabase.from('usuario').select('veiculo_id').eq('id', usuarioId).maybeSingle();
+  const perfil: Perfil = {
+    id: data.id,
+    empresa_id: data.empresa_id,
+    nome: data.nome,
+    perfil: data.perfil,
+    veiculo_id: (fixo as { veiculo_id: string | null } | null)?.veiculo_id ?? null,
+  };
   await cachePerfil.gravar(perfil);
   return perfil;
 }

@@ -3,6 +3,7 @@ export type Perfil = {
   empresa_id: string;
   nome: string;
   perfil: 'motorista' | 'gestor' | 'admin';
+  veiculo_id?: string | null;
 };
 
 export type Veiculo = {
