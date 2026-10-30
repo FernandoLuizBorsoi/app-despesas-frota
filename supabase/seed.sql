@@ -10,8 +10,8 @@ from nova, (values
   ('Combustível', true, true, 1),
   ('Pedágio', false, false, 2),
   ('Manutenção', true, false, 3),
-  ('Alimentação', false, false, 4),
-  ('Hospedagem', false, false, 5),
+  ('Triagem', false, false, 4),
+  ('Descarga', false, false, 5),
   ('Estacionamento', false, false, 6),
   ('Lavagem', false, false, 7),
   ('Outros', false, false, 8)
