@@ -188,6 +188,8 @@ export default function NovaDespesa() {
 
   const categoria = categorias.find((c) => c.id === categoriaId);
   const veiculo = veiculos.find((v) => v.id === veiculoId);
+  // Pedido do Fernando: na Carta Frete o motorista manda a nota e o recibo.
+  const cartaFrete = formaPagamento === 'Carta Frete';
   // Numa correção com outra placa, mostra todas para não esconder a que já estava escolhida.
   const soVeiculoFixo = Boolean(veiculoFixo) && !verTodosVeiculos && (!veiculoId || veiculoId === veiculoFixo);
 
@@ -226,6 +228,7 @@ export default function NovaDespesa() {
     const litrosNumero = numeroDeTexto(litros);
     if (categoria.exige_litros && (litrosNumero === null || litrosNumero <= 0)) return 'Informe os litros abastecidos.';
     if (fotos.length === 0) return 'Anexe o comprovante: tire uma foto ou escolha o arquivo.';
+    if (cartaFrete && fotos.length < 2) return 'Na Carta Frete, anexe duas fotos: a da nota e a do recibo.';
     return { valorCentavos, dataIso, kmNumero, litrosNumero };
   }
 
@@ -326,6 +329,7 @@ export default function NovaDespesa() {
             </Pressable>
           ))}
         </View>
+        {cartaFrete && <Text style={styles.dica}>Carta Frete: anexe a foto da nota e a do recibo.</Text>}
         {fotos.length > 0 && <Text style={styles.dica}>Segure o comprovante para remover.</Text>}
         {fotos.length < MAX_FOTOS && (
           <View style={styles.linha}>
