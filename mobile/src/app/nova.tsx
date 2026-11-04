@@ -227,6 +227,8 @@ export default function NovaDespesa() {
     const kmNumero = numeroDeTexto(km);
     const litrosNumero = numeroDeTexto(litros);
     if (categoria.exige_litros && (litrosNumero === null || litrosNumero <= 0)) return 'Informe os litros abastecidos.';
+    // Pedido do Fernando: toda despesa precisa de uma observação.
+    if (!observacao.trim()) return 'Preencha a observação.';
     if (fotos.length === 0) return 'Anexe o comprovante: tire uma foto ou escolha o arquivo.';
     if (cartaFrete && fotos.length < 2) return 'Na Carta Frete, anexe duas fotos: a da nota e a do recibo.';
     return { valorCentavos, dataIso, kmNumero, litrosNumero };
@@ -423,7 +425,7 @@ export default function NovaDespesa() {
       </View>
 
       <View>
-        <Text style={estilos.rotulo}>Observação (opcional)</Text>
+        <Text style={estilos.rotulo}>Observação</Text>
         <TextInput
           style={[estilos.campo, { minHeight: 70, textAlignVertical: 'top' }]}
           value={observacao}
