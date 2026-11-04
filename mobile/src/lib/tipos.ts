@@ -20,7 +20,7 @@ export type Categoria = {
   exige_litros: boolean;
 };
 
-export const FORMAS_PAGAMENTO = ['Cartão da empresa', 'Dinheiro', 'Pix', 'Cartão próprio'] as const;
+export const FORMAS_PAGAMENTO = ['Cartão da empresa', 'Dinheiro', 'Pix', 'Cartão próprio', 'Carta Frete'] as const;
 
 // Despesa como fica guardada no celular até ser enviada.
 export type DespesaLocal = {
